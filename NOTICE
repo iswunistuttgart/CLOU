@@ -1,0 +1,9 @@
+CLOU
+
+Copyright 2026 Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. and Universität Stuttgart
+
+This product includes third-party software components. A full list of dependencies and their licenses is available in each component's package manifest (pyproject.toml, package.json).
+
+This distribution includes software developed by the Apache Software Foundation (https://www.apache.org/), the FastAPI team, and other open-source projects.
+
+OPC UA is a trademark of the OPC Foundation.

@@ -1,0 +1,179 @@
+name: clou
+
+services:
+
+  db:
+    image: paradedb/paradedb:0.18.15
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-app}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - app-db-data:/var/lib/postgresql/data/pgdata
+    env_file:
+      - ./backend/.env
+    ports:
+      - "5432:5432"
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-app}
+
+  embedding-service:
+    #image: ${DOCKER_IMAGE_EMBEDDING_CPU:-embedding-service:latest_cpu}
+    build:
+      context: ./services/embedding
+      dockerfile: Dockerfile
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+    restart: always
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    environment:
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-Qwen/Qwen3-Embedding-0.6B}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-auto}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  prestart:
+    #image: '${DOCKER_IMAGE_BACKEND:-backend}:${TAG-latest}'
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    networks:
+      - default
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    command: bash /app/scripts/prestart.sh
+    env_file:
+      - ./backend/.env
+    environment:
+      - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
+      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost,http://localhost:5173,https://localhost,https://localhost:5173}
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-app}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+
+  backend:
+    #image: '${DOCKER_IMAGE_BACKEND:-backend}:${TAG-latest}'
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    networks:
+      - default
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      embedding-service:
+        condition: service_started
+      prestart:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend/data/db-backup.sql:/backups/db-backup.sql
+    env_file:
+      - ./backend/.env
+    environment:
+      - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
+      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost,http://localhost:5173,https://localhost,https://localhost:5173}
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-app}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - EMBEDDING_SERVICE_URL=http://embedding-service:8000
+      - EMBEDDING_ON_WRITE=${EMBEDDING_ON_WRITE:-false}
+      - EMBEDDING_PERIODIC_CATCHUP_ENABLED=${EMBEDDING_PERIODIC_CATCHUP_ENABLED:-false}
+      - EMBEDDING_CATCHUP_RUN_IN_API=${EMBEDDING_CATCHUP_RUN_IN_API:-false}
+      - EMBEDDING_MAX_INFLIGHT=${EMBEDDING_MAX_INFLIGHT:-2}
+      - EMBEDDING_CATCHUP_INTERVAL_SEC=${EMBEDDING_CATCHUP_INTERVAL_SEC:-5}
+      - EMBEDDING_CATCHUP_BATCH_SIZE=${EMBEDDING_CATCHUP_BATCH_SIZE:-50}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/utils/health-check/', timeout=5).getcode() == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+
+  embedding-catchup-worker:
+    profiles: ["import"]
+    #image: '${DOCKER_IMAGE_BACKEND:-backend}:${TAG-latest}'
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    networks:
+      - default
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      embedding-service:
+        condition: service_started
+      prestart:
+        condition: service_completed_successfully
+    env_file:
+      - ./backend/.env
+    environment:
+      - DOMAIN=${DOMAIN:-}
+      - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
+      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost,http://localhost:5173,https://localhost,https://localhost:5173}
+      - FIRST_SUPERUSER=${FIRST_SUPERUSER:-admin@example.com}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-changethis}
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-app}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - EMBEDDING_SERVICE_URL=http://embedding-service:8000
+      - EMBEDDING_ON_WRITE=false
+      - EMBEDDING_PERIODIC_CATCHUP_ENABLED=${EMBEDDING_PERIODIC_CATCHUP_ENABLED:-true}
+      - EMBEDDING_CATCHUP_RUN_IN_API=true
+      - EMBEDDING_MAX_INFLIGHT=${EMBEDDING_MAX_INFLIGHT:-2}
+      - EMBEDDING_CATCHUP_INTERVAL_SEC=${EMBEDDING_CATCHUP_INTERVAL_SEC:-5}
+      - EMBEDDING_CATCHUP_BATCH_SIZE=${EMBEDDING_CATCHUP_BATCH_SIZE:-50}
+      - EMBEDDING_WAIT_FOR_IMPORT_IDLE=${EMBEDDING_WAIT_FOR_IMPORT_IDLE:-true}
+      - EMBEDDING_IMPORT_IDLE_STABLE_CHECKS=${EMBEDDING_IMPORT_IDLE_STABLE_CHECKS:-3}
+      - EMBEDDING_IMPORT_IDLE_CHECK_SEC=${EMBEDDING_IMPORT_IDLE_CHECK_SEC:-5}
+    command: ["python", "-m", "app.embedding_worker"]
+
+volumes:
+  app-db-data:
+  hf-cache:

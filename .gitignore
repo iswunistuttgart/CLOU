@@ -1,0 +1,57 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+AGENTS.md
+
+# Local environment files
+#.env
+#.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Backend local/runtime artifacts
+#backend/.env
+backend/.venv/
+backend/linting_temp/
+backend/metrics_temp/
+backend/tools/
+
+
+# C# / .NET build outputs
+**/bin/
+**/obj/
+
+# Frontend / JS
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/package-lock.json
+
+# Docker / local containers
+*.pid
+
+services/metrics/Metrics/evaluation/
+services/metrics/Metrics/bin
+services/metrics/Metrics/obj
+
+services/linting/App/bin
+services/linting/App/obj
+
+
+backend/data/db-backup.sql

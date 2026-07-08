@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    	<AssemblyName>CLOU.Linting</AssemblyName>
+	<RootNamespace>CLOU.Linting</RootNamespace>
+  <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+
+  </PropertyGroup>
+
+    <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.8" />
+    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="JsonSchema.Net" Version="9.2.1" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Compile Remove="obj\Debug\Opc.Ua.ModelCompiler\**" />
+    <EmbeddedResource Remove="obj\Debug\Opc.Ua.ModelCompiler\**" />
+    <None Remove="obj\Debug\Opc.Ua.ModelCompiler\**" />
+  </ItemGroup>
+
+  <Target Name="CleanReflAttrs" AfterTargets="Clean">
+	 <RemoveDir Directories="$(SolutionDir)\obj\Debug\CLOU.Linting\" />
+	 <RemoveDir Directories="$(SolutionDir)\obj\Release\CLOU.Linting\" />
+	 <RemoveDir Directories="..\UA-ModelCompiler\Opc.Ua.ModelCompiler\build\obj\" />
+  </Target>
+
+
+  <ItemGroup>
+	<Compile Remove="obj\Release\Opc.Ua.ModelCompiler\**" />
+	<EmbeddedResource Remove="obj\Release\Opc.Ua.ModelCompiler\**" />
+	<None Remove="obj\Release\Opc.Ua.ModelCompiler\**" />
+  </ItemGroup>
+
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\UA-ModelCompiler\Opc.Ua.ModelCompiler\Opc.Ua.ModelCompiler.csproj" />
+  </ItemGroup>
+
+</Project>

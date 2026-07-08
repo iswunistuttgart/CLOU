@@ -1,0 +1,18 @@
+services:
+  embedding-service:
+    image: ${DOCKER_IMAGE_EMBEDDING_GPU:-embedding-service:latest_gpu}
+    build:
+      context: ./services/embedding
+      dockerfile: Dockerfile
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu124
+    gpus: all
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
+      - MAX_WORKERS=${MAX_WORKERS:-1}
+      - TOKENIZERS_PARALLELISM=${TOKENIZERS_PARALLELISM:-false}
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility

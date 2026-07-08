@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36221.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Metrics", "Metrics.csproj", "{A366FF88-6615-46D3-B047-4E93E0249207}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opc.Ua.ModelCompiler", "..\UA-ModelCompiler\Opc.Ua.ModelCompiler\Opc.Ua.ModelCompiler.csproj", "{B938AC8C-AD7B-C133-40C6-88455121CFF2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A366FF88-6615-46D3-B047-4E93E0249207}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A366FF88-6615-46D3-B047-4E93E0249207}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A366FF88-6615-46D3-B047-4E93E0249207}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A366FF88-6615-46D3-B047-4E93E0249207}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B938AC8C-AD7B-C133-40C6-88455121CFF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B938AC8C-AD7B-C133-40C6-88455121CFF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B938AC8C-AD7B-C133-40C6-88455121CFF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B938AC8C-AD7B-C133-40C6-88455121CFF2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {22B9AD8E-3C2B-4785-94C2-CEAF321A3142}
+	EndGlobalSection
+EndGlobal
