@@ -1,4 +1,4 @@
-# CLOU - Collaborative Learning for OPC UA
+# CLOU
 
 CLOU is a platform for analyzing and improving OPC UA model quality through semantic search, metrics analysis and linting.
 
