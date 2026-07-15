@@ -122,7 +122,7 @@ and
     </a>
 </p>
 
-**The project is funded by the Federal Ministry for Economic Affairs and Energy pursuant to a resolution of the German Bundestag.**
+**This Project is supported by the Federal Ministry for Economic Affairs and Energy (BMWE) on the basis of a decision by the German Bundestag.**
 
 Through the open-topic, cross-sector funding program “Industrial
 Collaborative Research” (IGF), the Federal Ministry for Economic Affairs and Energy
