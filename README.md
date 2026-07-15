@@ -114,8 +114,12 @@ and
 ## Funding Note
 
 <p align="center">
-  <img src="./assets/IGF_RGB.jpg" alt="IGF Logo" width="45%" align="middle">
-  <img src="./assets/BMWE_Fz_2025_Office_de.png" alt="BMWE Logo" width="45%" align="middle">
+    <a href="https://www.igf-foerderung.de">
+        <img src="./assets/IGF_RGB.jpg" alt="IGF Logo" width="45%" align="middle">
+    </a>
+    <a href="https://www.bmwe.de">
+        <img src="./assets/BMWE_Fz_2025_Office_de.png" alt="BMWE Logo" width="45%" align="middle">
+    </a>
 </p>
 
 **The project is funded by the Federal Ministry for Economic Affairs and Energy pursuant to a resolution of the German Bundestag.**
