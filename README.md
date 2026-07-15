@@ -117,7 +117,7 @@ and
     <a href="https://www.igf-foerderung.de">
         <img src="./assets/IGF_RGB.jpg" alt="IGF Logo" width="45%" align="middle">
     </a>
-    <a href="https://www.bmwe.de">
+    <a href="https://www.bundeswirtschaftsministerium.de">
         <img src="./assets/BMWE_Fz_2025_Office_de.png" alt="BMWE Logo" width="45%" align="middle">
     </a>
 </p>
