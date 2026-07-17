@@ -8,7 +8,7 @@ dependencies = [
     "fastapi>=0.115.4",
     "uvicorn[standard]>=0.30.6",
     "sentence-transformers>=3.3.1",
-    "torch>=2.5.1",
+    "torch>=2.13.0",
 ]
 
 [build-system]
