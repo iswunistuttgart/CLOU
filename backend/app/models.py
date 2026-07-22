@@ -163,11 +163,9 @@ class NodeBase(NodeBaseAttr, table=False):
     nodeset_id: int = Field(foreign_key="nodeset.id")
     typedefinition_id: int | None = Field(foreign_key="node.id", default=None)
     parent_id: int | None = Field(foreign_key="node.id", default=None)
-    example_id: int | None = Field(foreign_key="nodeset.id", default=None)  # zeigt auf ExampleNodeset
     data_type_id: int | None = Field(foreign_key="data_type.id", default=None)  # für Variable und VariableType
     unit_id: int | None = Field(foreign_key="unit.id", default=None)  # für Variable und VariableType
     modelling_rule_id: int | None = Field(foreign_key="modelling_rule.id", default=None)  # für Variable und Object
-    naming_example: str | None = Field(default=None)  # für VariableType und ObjectType
     is_abstract: bool | None = Field(default=None)  # für VariableType und ObjectType
 
 
@@ -204,16 +202,16 @@ class Node(NodeBase, Times, table=True):
 class NodeCreate(NodeBase, table=False):
     pass
 
-class NodeUpdate(NodeBase, table=False):
+class NodeUpdate(NodeBaseAttr, table=False):
+    node_type_id: int
+    typedefinition_expanded_node_id: str | None = None
+    parent_expanded_node_id: str | None = None
+    data_type_expanded_node_id: str | None = None  # für Variable und VariableType
+    unit_id: int | None = None # für Variable und VariableType
+    modelling_rule_id: int | None = None # für Variable und Object
+    is_abstract: bool | None = None # für VariableType und ObjectType
 
-    expanded_node_id: str | None = Field(default=None)
-    display_name: str | None = Field(default=None)
-    definition: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    documentation: str | None = Field(default=None)
-    node_type_id: int | None = Field(default=None, foreign_key="node_type.id")
-    spec_id: int | None = Field(default=None, foreign_key="spec.id")
-    nodeset_id: int | None = Field(default=None, foreign_key="nodeset.id")
+
 
 class NodePublic(NodeBase, Times, table=False):
     id: int
@@ -276,16 +274,13 @@ class NodeTypePublicWithLists(NodeTypePublic, table=False):
 ##### Nodeset #####
 class NodesetBase(SQLModel, table=False):
     uri: AnyHttpUrl = Field(sa_type=UriType)
-    name_short: str
+    name_short: str = Field(unique=True)
     version: str
     publication_date: datetime
     download_url: AnyHttpUrl = Field(sa_type=UriType)
 
 
 class Nodeset(NodesetBase, Times, table=True):
-    __table_args__ = (
-        UniqueConstraint('uri', 'version', name="unique_nodeset_uri_version"),
-    )
     id: int | None = Field(default=None, primary_key=True)
     specs: list["Spec"] = Relationship(back_populates="nodesets", link_model=SpecNodesetLink)
     nodes: list["Node"] = Relationship(back_populates="nodeset", sa_relationship_kwargs={"primaryjoin": "Node.nodeset_id == Nodeset.id", "foreign_keys": "Node.nodeset_id"})
@@ -317,7 +312,7 @@ class NodesetPublicWithLists(NodesetPublic, table=False):
 
 ##### Spec #####
 class SpecBase(SQLModel, table=False):
-    number: str
+    number: str = Field(unique=True)
     name_long: str
     name_short: str
     version: str
@@ -329,12 +324,7 @@ class SpecBase(SQLModel, table=False):
     download_url: AnyHttpUrl = Field(sa_type=UriType)
 
 
-
 class Spec(SpecBase, Times, table=True):
-
-    __table_args__ = (
-        UniqueConstraint('number', 'version', name="unique_spec_number_version"),
-    )
     id: int | None = Field(default=None, primary_key=True)
     data_types: list["DataType"] = Relationship(back_populates="spec")
     nodes: list["Node"] = Relationship(back_populates="spec")
@@ -379,6 +369,29 @@ class UnitPublicWithLists(UnitPublic, table=False):
     nodes: list["NodePublic"] = []
     
 
+#### Update Nodes, Specs and Nodesets ####
+class UpdateEntities(SQLModel, table=False):
+     spec: SpecCreate
+     nodeset: NodesetCreate 
+     nodes: list[NodeUpdate]
+
+
+class UpdateWarning(SQLModel, table=False):
+    message: str
+    expanded_node_id: str  | None = None
+    field_name: str | None = None
+
+class UpdateResponse(SQLModel, table=False):
+    success: bool
+    spec_number: str
+    spec_version: str
+    nodeset_name_short: str
+    nodeset_version: str
+    nodes_inserted: int = 0
+    nodes_updated: int = 0
+    nodes_deleted: int = 0
+    references_set_null: int = 0
+    warnings: list[UpdateWarning]  = []
 
 ##### Metrics #####
 class MetricsNodesetProvideResponse(SQLModel, table=False):
