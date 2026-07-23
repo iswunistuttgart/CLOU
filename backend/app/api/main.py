@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from app.api.routes import datatypes, modelling_rules, nodes, nodeset_required, nodesets, spec_nodeset_link, specs, metrics, utils, linting
+from app.api.routes import datatypes, modelling_rules, nodes, nodeset_required, nodesets, spec_nodeset_link, specs, metrics, utils, linting, update_entries
 from fastapi import APIRouter
 
 from app.api.routes import units
@@ -31,3 +31,4 @@ api_router.include_router(modelling_rules.router)
 api_router.include_router(metrics.router)
 api_router.include_router(utils.router)
 api_router.include_router(linting.router)
+api_router.include_router(update_entries.router)

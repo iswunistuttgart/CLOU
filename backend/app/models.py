@@ -94,6 +94,23 @@ class NodesetRequiredLinkCreate(NodesetRequiredBase, table=False):
 class NodesetRequiredLinkPublic(NodesetRequiredBase, Times, table=False):
     pass
 
+class NodesetRequiredHelper(Times, table=True):
+    __tablename__: str = "nodeset_requirement_helper"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "nodeset_id",
+            "required_nodeset_uri",
+            "required_nodeset_version",
+            name="uq_nodeset_required_helper_nodeset_uri_version",
+        ),
+    )
+    id: int | None = Field(default=None, primary_key=True)
+    nodeset_id: int = Field(foreign_key="nodeset.id")
+    required_nodeset_uri: str
+    required_nodeset_version: str | None
+
+
 ##### DataType #####
 class DataTypeBase(NodeBaseAttr, table=False):
     id: int | None = Field(primary_key=True, default=None)
@@ -162,7 +179,9 @@ class NodeBase(NodeBaseAttr, table=False):
     spec_id: int | None = Field(foreign_key="spec.id")
     nodeset_id: int = Field(foreign_key="nodeset.id")
     typedefinition_id: int | None = Field(foreign_key="node.id", default=None)
+    typedefinition_expanded_node_id: str | None = None
     parent_id: int | None = Field(foreign_key="node.id", default=None)
+    parent_expanded_node_id: str | None = None
     data_type_id: int | None = Field(foreign_key="data_type.id", default=None)  # für Variable und VariableType
     unit_id: int | None = Field(foreign_key="unit.id", default=None)  # für Variable und VariableType
     modelling_rule_id: int | None = Field(foreign_key="modelling_rule.id", default=None)  # für Variable und Object
@@ -370,11 +389,15 @@ class UnitPublicWithLists(UnitPublic, table=False):
     
 
 #### Update Nodes, Specs and Nodesets ####
+class NodesetRequirementUpdate(SQLModel, table=False):
+    required_nodeset_uri: str
+    required_nodeset_version: str | None
+
 class UpdateEntities(SQLModel, table=False):
      spec: SpecCreate
      nodeset: NodesetCreate 
      nodes: list[NodeUpdate]
-
+     required_nodesets: list[NodesetRequirementUpdate] = []
 
 class UpdateWarning(SQLModel, table=False):
     message: str
@@ -390,6 +413,8 @@ class UpdateResponse(SQLModel, table=False):
     nodes_inserted: int = 0
     nodes_updated: int = 0
     nodes_deleted: int = 0
+    references_resolved: int = 0
+    references_pending: int = 0
     references_set_null: int = 0
     warnings: list[UpdateWarning]  = []
 
