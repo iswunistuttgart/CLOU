@@ -15,7 +15,6 @@
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
 
 from app.models import UpdateEntities, UpdateResponse, UpdateWarning
 from app.api.deps import SessionDep
@@ -38,7 +37,7 @@ def update_entries(update_request: UpdateEntities, session: SessionDep) -> Updat
     except IntegrityError as e:
         session.rollback()
 
-        return UpdateResponse(
+        error_payload = UpdateResponse(
             success=False,
             spec_number=update_request.spec.number,
             spec_version=update_request.spec.version,
@@ -50,10 +49,12 @@ def update_entries(update_request: UpdateEntities, session: SessionDep) -> Updat
                 )
             ]
        )
+
+        raise HTTPException(status_code=409, detail=error_payload.model_dump())
     except Exception as e:
         session.rollback()
 
-        return UpdateResponse(
+        error_payload = UpdateResponse(
             success=False,
             spec_number=update_request.spec.number,
             spec_version=update_request.spec.version,
@@ -65,3 +66,5 @@ def update_entries(update_request: UpdateEntities, session: SessionDep) -> Updat
                 )
             ],
         )
+
+        raise HTTPException(status_code=500, detail=error_payload.model_dump())

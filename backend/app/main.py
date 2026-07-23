@@ -14,8 +14,10 @@
 
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 import logging, sys
 from contextlib import asynccontextmanager
@@ -45,6 +47,35 @@ logging.basicConfig(
 
 logger = logging.getLogger("app")
 logger.info("Logger initialized")
+
+
+def _truncate_for_log(value, max_len: int = 200):
+    if isinstance(value, str):
+        if len(value) > max_len:
+            return f"{value[:max_len]}...<truncated>"
+        return value
+
+    if isinstance(value, list):
+        return [_truncate_for_log(item, max_len=max_len) for item in value]
+
+    if isinstance(value, tuple):
+        return tuple(_truncate_for_log(item, max_len=max_len) for item in value)
+
+    if isinstance(value, dict):
+        truncated = {}
+        for key, item in value.items():
+            if key == "input":
+                item_str = str(item)
+                if len(item_str) > max_len:
+                    truncated[key] = f"{item_str[:max_len]}...<truncated>"
+                else:
+                    truncated[key] = item
+                continue
+
+            truncated[key] = _truncate_for_log(item, max_len=max_len)
+        return truncated
+
+    return value
 
 
 def get_sql_backup_path() -> str:
@@ -117,6 +148,35 @@ app = FastAPI(
     generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    body_preview = "<unavailable>"
+    try:
+        raw_body = await request.body()
+        body_preview = raw_body.decode("utf-8", errors="replace")
+    except Exception:
+        pass
+
+    max_preview_len = 50
+    if len(body_preview) > max_preview_len:
+        body_preview = f"{body_preview[:max_preview_len]}...<truncated>"
+
+    log_errors = _truncate_for_log(exc.errors(), max_len=50)
+
+    logger.warning(
+        "422 validation error on %s %s errors=%s body=%s",
+        request.method,
+        request.url.path,
+        log_errors,
+        body_preview,
+    )
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 @app.get("/api/v1/utils/health-check/", tags=["utils"])

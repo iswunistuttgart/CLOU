@@ -133,6 +133,9 @@ class DataType(DataTypeBase, Times, table=True):
 class DataTypeCreate(DataTypeBase, table=False):
     pass
 
+class DataTypeUpdate(NodeBaseAttr, table=False):
+        is_abstract: bool
+
 
 class DataTypePublic(DataTypeBase, Times, table=False):
     spec : "SpecPublic"
@@ -183,6 +186,7 @@ class NodeBase(NodeBaseAttr, table=False):
     parent_id: int | None = Field(foreign_key="node.id", default=None)
     parent_expanded_node_id: str | None = None
     data_type_id: int | None = Field(foreign_key="data_type.id", default=None)  # für Variable und VariableType
+    data_type_expanded_node_id: str | None = None
     unit_id: int | None = Field(foreign_key="unit.id", default=None)  # für Variable und VariableType
     modelling_rule_id: int | None = Field(foreign_key="modelling_rule.id", default=None)  # für Variable und Object
     is_abstract: bool | None = Field(default=None)  # für VariableType und ObjectType
@@ -230,8 +234,6 @@ class NodeUpdate(NodeBaseAttr, table=False):
     modelling_rule_id: int | None = None # für Variable und Object
     is_abstract: bool | None = None # für VariableType und ObjectType
 
-
-
 class NodePublic(NodeBase, Times, table=False):
     id: int
     node_type : "NodeTypePublic"
@@ -261,7 +263,6 @@ class NodeSemSearch(SQLModel, table=False):
     similarity: float
 
 ##### NodeType #####
-# ggf. gibts nen besseren Namen
 class NodeTypeEnum(str, Enum):
     variable = "Variable"
     variable_type = "VariableType"
@@ -397,6 +398,7 @@ class UpdateEntities(SQLModel, table=False):
      spec: SpecCreate
      nodeset: NodesetCreate 
      nodes: list[NodeUpdate]
+     datatype_nodes: list[DataTypeUpdate]
      required_nodesets: list[NodesetRequirementUpdate] = []
 
 class UpdateWarning(SQLModel, table=False):

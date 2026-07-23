@@ -160,6 +160,7 @@ def upgrade():
     sa.Column('parent_id', sa.Integer(), nullable=True),
     sa.Column('parent_expanded_node_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('data_type_id', sa.Integer(), nullable=True),
+    sa.Column('data_type_expanded_node_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('unit_id', sa.Integer(), nullable=True),
     sa.Column('modelling_rule_id', sa.Integer(), nullable=True),
     sa.Column('is_abstract', sa.Boolean(), nullable=True),
