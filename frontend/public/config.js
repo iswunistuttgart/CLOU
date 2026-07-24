@@ -1,0 +1,1 @@
+window.__CLOU_CONFIG__ = window.__CLOU_CONFIG__ || {};

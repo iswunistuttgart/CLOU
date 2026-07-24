@@ -40,6 +40,7 @@ import type {
   OPCUASpec,
   SpecFilterOption,
 } from "./types"
+import { runtimeConfig } from "@/runtimeConfig"
 
 interface OPCUANodesetWithSpecs extends OPCUANodeset {
   specs?: OPCUASpec[]
@@ -55,17 +56,12 @@ const FALLBACK_SELECTED_SPECS = [
 ]
 
 function parseDefaultSelectedSpecs(): string[] {
-  const rawSpecs = import.meta.env.VITE_DEFAULT_SELECTED_SPECS?.trim()
-  if (!rawSpecs) {
+  const envSpecs = runtimeConfig.defaultSelectedSpecs
+  if (!envSpecs || envSpecs.length == 0) {
     return FALLBACK_SELECTED_SPECS
   }
 
-  const envSpecs = rawSpecs
-    .split(",")
-    .map((spec) => spec.trim())
-    .filter((spec) => spec.length > 0)
-
-  return envSpecs.length > 0 ? envSpecs : FALLBACK_SELECTED_SPECS
+  return envSpecs
 }
 
 const DEFAULT_SELECTED_SPECS = parseDefaultSelectedSpecs()
@@ -73,7 +69,7 @@ const DEFAULT_NODE_TYPES = ["Object", "Variable", "Property"]
 type DetailsTab = "details" | "inheritance" | "overrides"
 
 function getApiBaseUrl(): string {
-  const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+  const configuredApiUrl = runtimeConfig.apiUrl
   return import.meta.env.DEV ? "" : configuredApiUrl || ""
 }
 

@@ -25,8 +25,9 @@ import ReactDOM from "react-dom/client"
 import { ApiError, OpenAPI } from "./client"
 import { CustomProvider } from "./components/ui/provider"
 import { routeTree } from "./routeTree.gen"
+import { runtimeConfig } from "./runtimeConfig"
 
-const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+const configuredApiUrl = runtimeConfig.apiUrl.trim()
 OpenAPI.BASE = import.meta.env.DEV ? "" : (configuredApiUrl || "")
 OpenAPI.TOKEN = async () => {
   return localStorage.getItem("access_token") || ""

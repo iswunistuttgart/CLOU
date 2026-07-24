@@ -21,12 +21,13 @@ import { useState } from "react";
 import { SizeResultsDetails } from "./SizeGraphs";
 import InconsistencyDetails from "./InconsistencyDetails";
 import { BestPracticeDetails } from "./BestPracticeDetails";
+import { runtimeConfig } from "@/runtimeConfig";
 
 function useLintingData(namespaces: string[]) {
   return useQuery<LintingAnalyzeResponse>({
     queryKey: ['chart-data', namespaces[0]],
     queryFn: async () => {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const baseUrl = runtimeConfig.apiUrl || '';
       const namespace_uri = namespaces[0];
       const res = await fetch(`${baseUrl}/api/v1/linting/analyze?namespace_uri=${encodeURIComponent(namespace_uri)}`);
 

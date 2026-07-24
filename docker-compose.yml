@@ -92,9 +92,8 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./backend/data/db-backup.sql:/backups/db-backup.sql
-    env_file:
-      - ./backend/.env
     environment:
+      - PROJECT_NAME=${PROJECT_NAME:-CLOU}
       - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
       - ENVIRONMENT=${ENVIRONMENT:-local}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost,http://localhost:5173,https://localhost,https://localhost:5173}
@@ -122,8 +121,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    environment:
+      VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}"
+      VITE_DEFAULT_SELECTED_SPECS: "${VITE_DEFAULT_SELECTED_SPECS:-Machinery,MachineTool,Core}"
     ports:
       - "5173:80"
     depends_on:

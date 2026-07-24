@@ -19,6 +19,7 @@ import { useMutation} from '@tanstack/react-query';
 import { LintingNodeSetProviderResponse } from './types';
 import { styles as S } from './styles'
 import LintingResultsSection from './LintingResultsSection';
+import { runtimeConfig } from '@/runtimeConfig';
 
 
 export function NodeSetFileUpload({ onUpload, numFiles }: { onUpload: (files: File[]) => Promise<void>, numFiles: number }) {
@@ -78,7 +79,7 @@ async function uploadNodeSetXML(files: File[]) : Promise<LintingNodeSetProviderR
     const formData = new FormData();
     formData.append('file', files[0]);
 
-    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const baseUrl = runtimeConfig.apiUrl || '';
     const res = await fetch(`${baseUrl}/api/v1/linting/provide`, {
         method: 'POST',
         body: formData,
@@ -193,7 +194,7 @@ function MissingDependenciesUpload({
       const formData = new FormData();
       files.forEach((f) => formData.append('files', f));
 
-      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const baseUrl = runtimeConfig.apiUrl || '';
       const res = await fetch(`${baseUrl}/api/v1/linting/provide_additional_nodesets`, {
         method: 'POST',
         body: formData,
@@ -228,7 +229,7 @@ function MissingDependenciesUpload({
 }
 
 async function OnDownload() {
-    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const baseUrl = runtimeConfig.apiUrl || '';
     const response = await fetch(`${baseUrl}/api/v1/linting/download`);
 
     if (!response.ok) {

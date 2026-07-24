@@ -23,6 +23,7 @@ import { NOCBarChart } from "./NOCChart";
 import { AggBarChart } from "./AggChart";
 import { IncludesInfo } from "./IncludesInfo";
 import { CategoriesInfo } from "./Categories";
+import { runtimeConfig } from "@/runtimeConfig";
 
 
 
@@ -31,7 +32,7 @@ function useChartData(namespaces: string[]) {
   return useQuery<MetricsAnalyzeResponse>({
     queryKey: ['chart-data', namespaces[0]],
     queryFn: async () => {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const baseUrl = runtimeConfig.apiUrl || '';
       const namespace_uri = namespaces[0];
       const res = await fetch(`${baseUrl}/api/v1/metrics/analyze?namespace_uri=${encodeURIComponent(namespace_uri)}`);
 
