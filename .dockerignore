@@ -6,7 +6,6 @@ backend/__pycache__
 backend/.pytest_cache
 backend/.mypy_cache
 backend/.ruff_cache
-backend/data/db-backup.sql
 backend/linting_temp
 backend/metrics_temp
 backend/tools
