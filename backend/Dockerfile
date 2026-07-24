@@ -79,6 +79,9 @@ ENV PYTHONPATH=/app
 
 COPY backend/scripts /app/scripts
 
+RUN mkdir -p /app/data
+COPY backend/data/db-backup.sql /app/data/db-backup.sql
+
 COPY backend/alembic.ini /app/
 
 COPY backend/app /app/app
