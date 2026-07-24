@@ -13,8 +13,6 @@ services:
       timeout: 10s
     volumes:
       - app-db-data:/var/lib/postgresql/data/pgdata
-    env_file:
-      - ./backend/.env
     ports:
       - "5432:5432"
     environment:
@@ -60,9 +58,8 @@ services:
         condition: service_healthy
         restart: true
     command: bash /app/scripts/prestart.sh
-    env_file:
-      - ./backend/.env
     environment:
+      - PROJECT_NAME=${PROJECT_NAME:-CLOU}
       - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
       - ENVIRONMENT=${ENVIRONMENT:-local}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost,http://localhost:5173,https://localhost,https://localhost:5173}
@@ -148,9 +145,8 @@ services:
         condition: service_started
       prestart:
         condition: service_completed_successfully
-    env_file:
-      - ./backend/.env
     environment:
+      - PROJECT_NAME=${PROJECT_NAME:-CLOU}
       - DOMAIN=${DOMAIN:-}
       - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
       - ENVIRONMENT=${ENVIRONMENT:-local}
