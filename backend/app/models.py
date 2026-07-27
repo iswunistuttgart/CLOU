@@ -178,7 +178,7 @@ class ModellingRulePublicWithLists(ModellingRulePublic, table=False):
 
 ##### Node #####
 class NodeBase(NodeBaseAttr, table=False):
-    node_type_id: int = Field(foreign_key="node_type.id")
+    node_class_id: int = Field(foreign_key="node_class.id")
     spec_id: int | None = Field(foreign_key="spec.id")
     nodeset_id: int = Field(foreign_key="nodeset.id")
     typedefinition_id: int | None = Field(foreign_key="node.id", default=None)
@@ -206,7 +206,7 @@ class Node(NodeBase, Times, table=True):
         ),
     )
     id: int | None = Field(default=None, primary_key=True)
-    node_type: "NodeType" = Relationship(back_populates="nodes")
+    node_class: "NodeClass" = Relationship(back_populates="nodes")
     spec: "Spec" = Relationship(back_populates="nodes")
     nodeset: "Nodeset" = Relationship(back_populates="nodes", sa_relationship_kwargs={"foreign_keys": "Node.nodeset_id"})
     parent: Optional["Node"] = Relationship(back_populates="children",
@@ -226,7 +226,7 @@ class NodeCreate(NodeBase, table=False):
     pass
 
 class NodeUpdate(NodeBaseAttr, table=False):
-    node_type_id: int
+    node_class_id: int
     typedefinition_expanded_node_id: str | None = None
     parent_expanded_node_id: str | None = None
     data_type_expanded_node_id: str | None = None  # für Variable und VariableType
@@ -236,7 +236,7 @@ class NodeUpdate(NodeBaseAttr, table=False):
 
 class NodePublic(NodeBase, Times, table=False):
     id: int
-    node_type : "NodeTypePublic"
+    node_class : "NodeClassPublic"
     spec : Optional["SpecPublic"]
     nodeset: "NodesetPublic"
     parent: Optional["NodePublicReference"]
@@ -251,7 +251,7 @@ class NodePublicWithLists(NodePublic, table=False):
 
 class NodePublicReference(NodeBase, Times, table=False): #only flat hierarchy without further parent/children or typedefinition structure
     id: int
-    node_type : "NodeTypePublic"
+    node_class : "NodeClassPublic"
     spec : Optional["SpecPublic"]
     nodeset : "NodesetPublic"
     data_type: Optional["DataTypePublic"]
@@ -262,33 +262,35 @@ class NodeSemSearch(SQLModel, table=False):
     node: NodePublicWithLists
     similarity: float
 
-##### NodeType #####
-class NodeTypeEnum(str, Enum):
+##### NodeClass #####
+class NodeClassEnum(str, Enum):
     variable = "Variable"
     variable_type = "VariableType"
     object = "Object"
     object_type = "ObjectType"
+    method = "Method"
+    data_type="DataType"
 
 
-class NodeTypeBase(SQLModel, table=False):
-    __tablename__: str = "node_type"
+class NodeClassBase(SQLModel, table=False):
+    __tablename__: str = "node_class"
 
     id: int = Field(primary_key=True)
-    node_type: NodeTypeEnum = Field(unique=True)
+    node_class: NodeClassEnum = Field(unique=True)
 
 
-class NodeType(NodeTypeBase, Times, table=True):
-    nodes: list["Node"] = Relationship(back_populates="node_type")
+class NodeClass(NodeClassBase, Times, table=True):
+    nodes: list["Node"] = Relationship(back_populates="node_class")
 
 
-class NodeTypeCreate(NodeTypeBase, table=False):
+class NodeClassCreate(NodeClassBase, table=False):
     pass
 
 
-class NodeTypePublic(NodeTypeBase, Times, table=False):
+class NodeClassPublic(NodeClassBase, Times, table=False):
     id: int
 
-class NodeTypePublicWithLists(NodeTypePublic, table=False):
+class NodeClassPublicWithLists(NodeClassPublic, table=False):
     nodes : list["NodePublic"] = []
 
 ##### Nodeset #####

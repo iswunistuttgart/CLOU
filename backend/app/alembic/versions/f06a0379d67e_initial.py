@@ -44,13 +44,13 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('rule')
     )
-    op.create_table('node_type',
+    op.create_table('node_class',
     sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
     sa.Column('update_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('node_type', sa.Enum('variable', 'variable_type', 'object', 'object_type', name='nodetypeenum'), nullable=False),
+    sa.Column('node_class', sa.Enum('variable', 'variable_type', 'object', 'object_type', 'method', name='nodeclassenum'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('node_type')
+    sa.UniqueConstraint('node_class')
     )
     op.create_table('nodeset',
     sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
@@ -152,7 +152,7 @@ def upgrade():
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('description_vector', pgvector.sqlalchemy.vector.VECTOR(dim=1024), nullable=True),
     sa.Column('documentation', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('node_type_id', sa.Integer(), nullable=False),
+    sa.Column('node_class_id', sa.Integer(), nullable=False),
     sa.Column('spec_id', sa.Integer(), nullable=True),
     sa.Column('nodeset_id', sa.Integer(), nullable=False),
     sa.Column('typedefinition_id', sa.Integer(), nullable=True),
@@ -167,7 +167,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['data_type_id'], ['data_type.id'], ),
     sa.ForeignKeyConstraint(['modelling_rule_id'], ['modelling_rule.id'], ),
-    sa.ForeignKeyConstraint(['node_type_id'], ['node_type.id'], ),
+    sa.ForeignKeyConstraint(['node_class_id'], ['node_class.id'], ),
     sa.ForeignKeyConstraint(['nodeset_id'], ['nodeset.id'], ),
     sa.ForeignKeyConstraint(['parent_id'], ['node.id'], ),
     sa.ForeignKeyConstraint(['spec_id'], ['spec.id'], ),
@@ -217,6 +217,6 @@ def downgrade():
     op.drop_table('unit')
     op.drop_table('spec')
     op.drop_table('nodeset')
-    op.drop_table('node_type')
+    op.drop_table('node_class')
     op.drop_table('modelling_rule')
     # ### end Alembic commands ###

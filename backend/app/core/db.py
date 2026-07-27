@@ -25,7 +25,7 @@ from alembic.script import ScriptDirectory
 from sqlmodel import Session, create_engine, select
 
 from app.core.config import settings
-from app.models import NodeType, NodeTypeEnum, ModellingRule, ModellingRuleEnum
+from app.models import NodeClass, NodeClassEnum, ModellingRule, ModellingRuleEnum
 
 engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 
@@ -38,7 +38,7 @@ REQUIRED_SEEDED_TABLES = (
     "spec",
     "data_type",
     "modelling_rule",
-    "node_type",
+    "node_class",
     "unit",
     "node",
     "nodeset_required_link",
@@ -151,15 +151,17 @@ def create_initial_values() -> None:
     with Session(engine) as session:
 
         # Seed rows are inserted only when the exact key is missing.
-        node_types_seed = {
-            1: NodeTypeEnum.object.value,
-            2: NodeTypeEnum.object_type.value,
-            3: NodeTypeEnum.variable.value,
-            4: NodeTypeEnum.variable_type.value,
+        node_class_seed = {
+            1: NodeClassEnum.object.value,
+            2: NodeClassEnum.object_type.value,
+            3: NodeClassEnum.variable.value,
+            4: NodeClassEnum.variable_type.value,
+            5: NodeClassEnum.method.value,
+            6: NodeClassEnum.data_type.value
         }
-        for node_type_id, node_type_value in node_types_seed.items():
-            if session.get(NodeType, node_type_id) is None:
-                session.add(NodeType(id=node_type_id, node_type=node_type_value))
+        for node_class_id, node_class_value in node_class_seed.items():
+            if session.get(NodeClass, node_class_id) is None:
+                session.add(NodeClass(id=node_class_id, node_class=node_class_value))
 
         modelling_rules_seed = {
             78: ModellingRuleEnum.mandatory.value,

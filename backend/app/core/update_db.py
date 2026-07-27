@@ -29,6 +29,8 @@ def update_entries_in_db(
     references_resolved = 0
     references_pending = 0
 
+    is_core_nodeset = _is_core_nodeset(update_request.nodeset)
+
     should_process_update, skip_reason = _should_process_nodeset_update(
         session=session,
         incoming_nodeset=update_request.nodeset,
@@ -109,6 +111,7 @@ def update_entries_in_db(
         references_nulled_for_deleted_nodes
     ) = _delete_removed_nodes(
         session=session,
+        current_spec_id=spec.id if is_core_nodeset else None,
         existing_nodes_before_update=existing_nodes_before_update,
         incoming_nodes=incoming_nodes,
         warnings=warnings
@@ -122,6 +125,7 @@ def update_entries_in_db(
         references_nulled_for_deleted_datatypes,
     ) = _delete_removed_datatype_nodes(
         session=session,
+        current_spec_id=spec.id if is_core_nodeset else None,
         existing_datatype_nodes_before_update=existing_datatype_nodes_before_update,
         incoming_datatype_nodes=incoming_datatype_nodes,
         warnings=warnings,
@@ -187,6 +191,12 @@ def _should_process_nodeset_update(
 
     if existing_nodeset is None:
         return True, "nodeset does not exist yet"
+
+    if _is_core_nodeset(incoming_nodeset):
+        return (
+            True,
+            "Core nodeset is imported per spec, so repeated updates are allowed",
+        )
 
     if _is_incoming_nodeset_version_newer(
             existing_version=existing_nodeset.version,
@@ -710,12 +720,22 @@ def _resolve_node_references(
 
 def _delete_removed_nodes(
     session: SessionDep,
+    current_spec_id: int | None,
     existing_nodes_before_update: list[NodePublic],
     incoming_nodes: list[NodeUpdate],
     warnings: list[UpdateWarning],
 ) -> tuple[int, int]:
     nodes_deleted = 0
     references_set_null = 0
+
+    existing_nodes = existing_nodes_before_update
+
+    if current_spec_id is not None:
+        existing_nodes = [
+            node
+            for node in existing_nodes_before_update
+            if node.spec_id == current_spec_id
+        ]
 
     incoming_expanded_node_ids = {
         node.expanded_node_id
@@ -724,7 +744,7 @@ def _delete_removed_nodes(
 
     removed_nodes = [
         node
-        for node in existing_nodes_before_update
+        for node in existing_nodes
         if node.expanded_node_id not in incoming_expanded_node_ids
     ]
 
@@ -789,12 +809,22 @@ def _delete_removed_nodes(
 
 def _delete_removed_datatype_nodes(
     session: SessionDep,
+    current_spec_id: int | None,
     existing_datatype_nodes_before_update: list[DataTypePublic],
     incoming_datatype_nodes: list[DataTypeUpdate],
     warnings: list[UpdateWarning],
 ) -> tuple[int, int]:
     datatypes_deleted = 0
     references_set_null = 0
+
+    existing_datatype_nodes = existing_datatype_nodes_before_update
+
+    if current_spec_id is not None:
+        existing_datatype_nodes = [
+            datatype
+            for datatype in existing_datatype_nodes_before_update
+            if datatype.spec_id == current_spec_id
+        ]
 
     incoming_expanded_node_ids = {
         datatype.expanded_node_id
@@ -803,7 +833,7 @@ def _delete_removed_datatype_nodes(
 
     removed_datatypes = [
         datatype
-        for datatype in existing_datatype_nodes_before_update
+        for datatype in existing_datatype_nodes
         if datatype.expanded_node_id not in incoming_expanded_node_ids
     ]
 
@@ -920,3 +950,7 @@ def _apply_data_to_model(db_obj, data: dict) -> None:
     for key, value in data.items():
         if hasattr(db_obj, key):
             setattr(db_obj, key, value)
+
+
+def _is_core_nodeset(nodeset: NodesetBase | NodesetCreate | Nodeset) -> bool:
+    return nodeset.name_short == "Core" or str(nodeset.uri) == "http://opcfoundation.org/UA/"
