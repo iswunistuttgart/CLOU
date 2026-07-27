@@ -25,7 +25,7 @@ from typing import Optional, List
 from sqlalchemy.orm import sessionmaker
 import httpx
 
-from app.models import Node, NodeCreate, NodeUpdate, NodePublic, NodePublicWithLists, NodeSemSearch
+from app.models import Node, NodeCreate, NodeUpdate, NodePublic, NodePublicWithLists, NodeSemSearch, NodeClassEnum, NodeClass, Nodeset
 from app.api.deps import SessionDep
 from app.core.config import settings
 from app.services.embeddings import embed_node_fields, get_embedding_service
@@ -60,7 +60,9 @@ def read_node(node_id: int, session: SessionDep) -> NodePublicWithLists:
 def read_nodes(session: SessionDep,
                id: Optional[int] = None,
                display_name: Optional[str] = None,
-               expanded_node_id: Optional[str] = None
+               expanded_node_id: Optional[str] = None,
+               node_class: Optional[NodeClassEnum] = None,
+               nodeset_uri: Optional[str] = None
                ) -> list[NodePublicWithLists]:
     query = select(Node)
 
@@ -73,9 +75,15 @@ def read_nodes(session: SessionDep,
     if expanded_node_id is not None:
         query = query.where(Node.expanded_node_id == expanded_node_id)
 
+    if node_class is not None: 
+        query = query.join(NodeClass, Node.node_class_id == NodeClass.id).where(NodeClass.node_class == node_class)
+
+    if nodeset_uri is not None: 
+        query = query.join(Nodeset, Node.nodeset_id == Nodeset.id).where(Nodeset.uri == nodeset_uri) 
+
     result = session.exec(query).all()
 
-    return result ##todo: probieren, ob bei verwendung von parametern und 1 oder 0 ergegbnissen auch liste zuückkommt
+    return result
 
 
 @router.post("/", response_model=NodePublic)

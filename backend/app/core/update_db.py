@@ -4,7 +4,7 @@ import re
 from app.models import *
 from app.api.deps import SessionDep
 from sqlmodel import select
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
 
 logger = logging.getLogger("app.update-db")
@@ -17,14 +17,10 @@ def update_entries_in_db(
     warnings: list[UpdateWarning] = []
 
     incoming_nodes = update_request.nodes or []
-    incoming_datatype_nodes = update_request.datatype_nodes or []
 
     nodes_inserted = 0
     nodes_updated = 0
     nodes_deleted = 0
-    datatypes_inserted = 0
-    datatypes_updated = 0
-    datatypes_deleted = 0
     references_set_null = 0
     references_resolved = 0
     references_pending = 0
@@ -85,17 +81,6 @@ def update_entries_in_db(
     )
 
     (
-        datatypes_inserted,
-        datatypes_updated,
-        existing_datatype_nodes_before_update,
-    ) = _upsert_datatype_nodes(
-        session=session,
-        spec=spec,
-        nodeset=nodeset,
-        incoming_datatype_nodes=incoming_datatype_nodes,
-    )
-
-    (
         nodes_inserted,
         nodes_updated, 
         existing_nodes_before_update
@@ -120,18 +105,6 @@ def update_entries_in_db(
     nodes_deleted += deleted_count
     references_set_null += references_nulled_for_deleted_nodes
 
-    (
-        datatypes_deleted,
-        references_nulled_for_deleted_datatypes,
-    ) = _delete_removed_datatype_nodes(
-        session=session,
-        current_spec_id=spec.id if is_core_nodeset else None,
-        existing_datatype_nodes_before_update=existing_datatype_nodes_before_update,
-        incoming_datatype_nodes=incoming_datatype_nodes,
-        warnings=warnings,
-    )
-
-    references_set_null += references_nulled_for_deleted_datatypes
 
     _reconcile_nodeset_required_links(session=session)
 
@@ -148,7 +121,7 @@ def update_entries_in_db(
     references_set_null += set_null_count
 
     logger.info(
-        "update request summary spec=%s/%s nodeset=%s/%s nodes(inserted=%d updated=%d deleted=%d) datatypes(inserted=%d updated=%d deleted=%d) refs(resolved=%d pending=%d set_null=%d) warnings=%d",
+        "update request summary spec=%s/%s nodeset=%s/%s nodes(inserted=%d updated=%d deleted=%d) refs(resolved=%d pending=%d set_null=%d) warnings=%d",
         spec.number,
         spec.version,
         nodeset.name_short,
@@ -156,9 +129,6 @@ def update_entries_in_db(
         nodes_inserted,
         nodes_updated,
         nodes_deleted,
-        datatypes_inserted,
-        datatypes_updated,
-        datatypes_deleted,
         references_resolved,
         references_pending,
         references_set_null,
@@ -452,83 +422,6 @@ def _upsert_nodes(
 
     return nodes_inserted, nodes_updated, existing_nodes
 
-
-def _upsert_datatype_nodes(
-        session: SessionDep,
-        spec: Spec,
-        nodeset: Nodeset,
-        incoming_datatype_nodes: list[DataTypeUpdate],
-) -> tuple[int, int, list[DataTypePublic]]:
-    existing_datatype_nodes = session.exec(
-        select(DataType).where(DataType.nodeset_id == nodeset.id)
-    ).all()
-
-    incoming_by_expanded_node_id = {}
-    incoming_expanded_node_ids = {
-        datatype_request.expanded_node_id
-        for datatype_request in incoming_datatype_nodes
-    }
-
-    globally_existing_datatypes = []
-
-    if incoming_expanded_node_ids:
-        globally_existing_datatypes = session.exec(
-            select(DataType).where(
-                DataType.expanded_node_id.in_(
-                    list(incoming_expanded_node_ids)
-                )
-            )
-        ).all()
-
-    existing_by_expanded_node_id = {
-        data_type.expanded_node_id: data_type
-        for data_type in globally_existing_datatypes
-    }
-
-    for datatype_request in incoming_datatype_nodes:
-        if datatype_request.expanded_node_id in incoming_by_expanded_node_id:
-            raise ValueError(
-                f"Duplicate datatype expanded_node_id in request: "
-                f"{datatype_request.expanded_node_id}"
-            )
-
-        incoming_by_expanded_node_id[datatype_request.expanded_node_id] = datatype_request
-
-    datatypes_inserted = 0
-    datatypes_updated = 0
-
-    exclude_fields = {"id"}
-
-    for datatype_request in incoming_datatype_nodes:
-        datatype_data = _dump_model(
-            datatype_request,
-            exclude=exclude_fields,
-        )
-
-        datatype_data["spec_id"] = spec.id
-        datatype_data["nodeset_id"] = nodeset.id
-
-        existing_datatype_node = existing_by_expanded_node_id.get(datatype_request.expanded_node_id)
-
-        if existing_datatype_node is None:
-            data_type = DataType(**datatype_data)
-            session.add(data_type)
-            datatypes_inserted += 1
-        else:
-            # DataTypes are globally unique by expanded_node_id. If a row already
-            # exists, update shared fields but keep ownership (spec/nodeset) stable.
-            if existing_datatype_node.nodeset_id != nodeset.id:
-                datatype_data.pop("spec_id", None)
-                datatype_data.pop("nodeset_id", None)
-
-            _apply_data_to_model(existing_datatype_node, datatype_data)
-            session.add(existing_datatype_node)
-            datatypes_updated += 1
-
-    session.flush()
-
-    return datatypes_inserted, datatypes_updated, existing_datatype_nodes
-
 def _resolve_node_references(
         session: SessionDep,
         nodeset: Nodeset | None = None,
@@ -542,19 +435,40 @@ def _resolve_node_references(
     references_pending = 0
     references_set_null = 0
 
-    query = select(Node)
+    candidate_filter = or_(
+        and_(
+            Node.parent_expanded_node_id.is_not(None),
+            Node.parent_id.is_(None)
+        ),
+        and_(
+                    Node.typedefinition_expanded_node_id.is_not(None),
+                    Node.typedefinition_id.is_(None)
+        ),
+        and_(
+                    Node.data_type_expanded_node_id.is_not(None),
+                    Node.data_type_id.is_(None)
+        )
+    )
+
+    query = select(Node).where(candidate_filter)
+
+
+    #query = select(Node)
 
     if nodeset is not None:
         query = query.where(Node.nodeset_id == nodeset.id)
 
     nodes = session.exec(query).all()
 
+    if not nodes:
+        return 0, 0, 0
+
     referenced_node_expanded_node_ids: set[str] = set()
-    referenced_data_type_expanded_node_ids: set[str] = set()
 
     for node in nodes:
         if node.parent_expanded_node_id:
-            referenced_node_expanded_node_ids.add(node.parent_expanded_node_id)
+            referenced_node_expanded_node_ids.add(
+                node.parent_expanded_node_id)
 
         if node.typedefinition_expanded_node_id:
             referenced_node_expanded_node_ids.add(
@@ -562,12 +476,11 @@ def _resolve_node_references(
             )
 
         if node.data_type_expanded_node_id:
-            referenced_data_type_expanded_node_ids.add(
+            referenced_node_expanded_node_ids.add(
                 node.data_type_expanded_node_id
             )
 
     referenced_nodes_by_expanded_node_id: dict[str, Node] = {}
-    referenced_datatypes_by_expanded_node_id: dict[str, DataType] = {}
 
     if referenced_node_expanded_node_ids:
         referenced_nodes = session.exec(
@@ -583,137 +496,78 @@ def _resolve_node_references(
             for referenced_node in referenced_nodes
         }
 
-    if referenced_data_type_expanded_node_ids:
-        referenced_datatypes = session.exec(
-            select(DataType).where(
-                DataType.expanded_node_id.in_(
-                    list(referenced_data_type_expanded_node_ids)
-                )
-            )
-        ).all()
+    def resolve_reference(
+            *,
+            node:Node,
+            expanded_node_id: str | None,
+            id_attr: str,
+            warning_message: str,
+    ) -> bool:
+        nonlocal references_resolved
+        nonlocal references_pending
 
-        referenced_datatypes_by_expanded_node_id = {
-            referenced_datatype.expanded_node_id: referenced_datatype
-            for referenced_datatype in referenced_datatypes
-        }
+        current_id = getattr(node, id_attr)
+
+        if not expanded_node_id or current_id is not None:
+            return False
+
+        referenced_node = referenced_nodes_by_expanded_node_id.get(
+            expanded_node_id
+        )
+
+        if referenced_node is not None:
+            setattr(node, id_attr, referenced_node.id)
+            references_resolved += 1
+            return True
+
+        references_pending += 1
+
+        should_warn_for_node = (
+            warn_for_nodeset_id is None or node.nodeset_id == warn_for_nodeset_id
+        )
+
+        if should_warn_for_node:
+            warnings.append(
+                UpdateWarning(
+                            message=warning_message,
+                            expanded_node_id=node.expanded_node_id,
+                            field_name="id_attr",
+                        )
+            )
+
+        return False
+
+    any_changed = False
 
     for node in nodes:
         changed = False
-
-        should_warn_for_node = (
-            warn_for_nodeset_id is None
-            or node.nodeset_id == warn_for_nodeset_id
+        changed |= resolve_reference(
+            node=node,
+            expanded_node_id=node.parent_expanded_node_id,
+            id_attr="parent_id",
+            warning_message="Parent reference is pending because the target node is not imported yet."
+        )
+    
+        changed |= resolve_reference(
+            node=node,
+            expanded_node_id=node.typedefinition_expanded_node_id,
+            id_attr="typedefinition_id",
+            warning_message="TypeDefinition reference is pending because the target node is not imported yet."
         )
 
-        if node.parent_expanded_node_id:
-            parent_node = referenced_nodes_by_expanded_node_id.get(
-                node.parent_expanded_node_id
-            )
-
-            if parent_node is not None:
-                if node.parent_id != parent_node.id:
-                    node.parent_id = parent_node.id
-                    references_resolved += 1
-                    changed = True
-            else:
-                references_pending += 1
-
-                if node.parent_id is not None:
-                    node.parent_id = None
-                    references_set_null += 1
-                    changed = True
-
-                if should_warn_for_node:
-                    warnings.append(
-                        UpdateWarning(
-                            message=(
-                                "Parent reference is pending because the target "
-                                "node is not imported yet."
-                            ),
-                            expanded_node_id=node.expanded_node_id,
-                            field_name="parent_id",
-                        )
-                    )
-        else:
-            if node.parent_id is not None:
-                node.parent_id = None
-                references_set_null += 1
-                changed = True
-
-        if node.typedefinition_expanded_node_id:
-            typedefinition_node = referenced_nodes_by_expanded_node_id.get(
-                node.typedefinition_expanded_node_id
-            )
-
-            if typedefinition_node is not None:
-                if node.typedefinition_id != typedefinition_node.id:
-                    node.typedefinition_id = typedefinition_node.id
-                    references_resolved += 1
-                    changed = True
-            else:
-                references_pending += 1
-
-                if node.typedefinition_id is not None:
-                    node.typedefinition_id = None
-                    references_set_null += 1
-                    changed = True
-
-                if should_warn_for_node:
-                    warnings.append(
-                        UpdateWarning(
-                            message=(
-                                "TypeDefinition reference is pending because the "
-                                "target node is not imported yet."
-                            ),
-                            expanded_node_id=node.expanded_node_id,
-                            field_name="typedefinition_id",
-                        )
-                    )
-        else:
-            if node.typedefinition_id is not None:
-                node.typedefinition_id = None
-                references_set_null += 1
-                changed = True
-
-        if node.data_type_expanded_node_id:
-            data_type = referenced_datatypes_by_expanded_node_id.get(
-                node.data_type_expanded_node_id
-            )
-
-            if data_type is not None:
-                if node.data_type_id != data_type.id:
-                    node.data_type_id = data_type.id
-                    references_resolved += 1
-                    changed = True
-            else:
-                references_pending += 1
-
-                if node.data_type_id is not None:
-                    node.data_type_id = None
-                    references_set_null += 1
-                    changed = True
-
-                if should_warn_for_node:
-                    warnings.append(
-                        UpdateWarning(
-                            message=(
-                                "DataType reference is pending because the target "
-                                "node is not imported yet."
-                            ),
-                            expanded_node_id=node.expanded_node_id,
-                            field_name="data_type_id",
-                        )
-                    )
-        else:
-            if node.data_type_id is not None:
-                node.data_type_id = None
-                references_set_null += 1
-                changed = True
+        changed |= resolve_reference(
+            node=node,
+            expanded_node_id=node.data_type_expanded_node_id,
+            id_attr="data_type_id",
+            warning_message="DataType reference is pending because the target node is not imported yet."
+        )
 
         if changed:
             session.add(node)
+            any_changed = True
 
-    session.flush()
+    if any_changed:
+        session.flush()
 
     return references_resolved, references_pending, references_set_null
 
@@ -759,7 +613,8 @@ def _delete_removed_nodes(
             select(Node).where(
                 or_(
                     Node.parent_id.in_(removed_node_ids),
-                    Node.typedefinition_id.in_(removed_node_ids)
+                    Node.typedefinition_id.in_(removed_node_ids),
+                    Node.data_type_id.in_(removed_node_ids)
                 )
             )
         ).all()
@@ -793,6 +648,19 @@ def _delete_removed_nodes(
                     )
                 )
 
+            if referencing_node.data_type_id in removed_node_ids:
+                referencing_node.data_type_id = None
+                references_set_null += 1
+                changed = True
+
+                warnings.append(
+                    UpdateWarning(
+                        message="Reference to deleted data type node set to NULL.",
+                        expanded_node_id=referencing_node.expanded_node_id,
+                        field_name="data_type_id",
+                    )
+                )
+
             if changed:
                 session.add(referencing_node)
 
@@ -805,73 +673,6 @@ def _delete_removed_nodes(
     session.flush()
 
     return nodes_deleted, references_set_null
-
-
-def _delete_removed_datatype_nodes(
-    session: SessionDep,
-    current_spec_id: int | None,
-    existing_datatype_nodes_before_update: list[DataTypePublic],
-    incoming_datatype_nodes: list[DataTypeUpdate],
-    warnings: list[UpdateWarning],
-) -> tuple[int, int]:
-    datatypes_deleted = 0
-    references_set_null = 0
-
-    existing_datatype_nodes = existing_datatype_nodes_before_update
-
-    if current_spec_id is not None:
-        existing_datatype_nodes = [
-            datatype
-            for datatype in existing_datatype_nodes_before_update
-            if datatype.spec_id == current_spec_id
-        ]
-
-    incoming_expanded_node_ids = {
-        datatype.expanded_node_id
-        for datatype in incoming_datatype_nodes
-    }
-
-    removed_datatypes = [
-        datatype
-        for datatype in existing_datatype_nodes
-        if datatype.expanded_node_id not in incoming_expanded_node_ids
-    ]
-
-    removed_datatype_ids = [
-        datatype.id
-        for datatype in removed_datatypes
-        if datatype.id is not None
-    ]
-
-    if removed_datatype_ids:
-        referencing_nodes = session.exec(
-            select(Node).where(
-                Node.data_type_id.in_(removed_datatype_ids)
-            )
-        ).all()
-
-        for referencing_node in referencing_nodes:
-            referencing_node.data_type_id = None
-            references_set_null += 1
-            session.add(referencing_node)
-
-            warnings.append(
-                UpdateWarning(
-                    message="Reference to deleted data type node set to NULL.",
-                    expanded_node_id=referencing_node.expanded_node_id,
-                    field_name="data_type_id",
-                )
-            )
-
-        session.flush()
-
-    for datatype in removed_datatypes:
-        session.delete(datatype)
-        datatypes_deleted += 1
-
-    session.flush()
-
-    return datatypes_deleted, references_set_null
 
 def _reconcile_nodeset_required_links(session: SessionDep) -> None:
     helpers = session.exec(

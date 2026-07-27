@@ -48,7 +48,7 @@ def upgrade():
     sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
     sa.Column('update_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('node_class', sa.Enum('variable', 'variable_type', 'object', 'object_type', 'method', name='nodeclassenum'), nullable=False),
+    sa.Column('node_class', sa.Enum('variable', 'variable_type', 'object', 'object_type', 'method', 'data_type', name='nodeclassenum'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('node_class')
     )
@@ -88,27 +88,6 @@ def upgrade():
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('unece_code')
-    )
-    op.create_table('data_type',
-    sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('update_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('expanded_node_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('display_name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('display_name_vector', pgvector.sqlalchemy.vector.VECTOR(dim=1024), nullable=True),
-    sa.Column('definition', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('definition_vector', pgvector.sqlalchemy.vector.VECTOR(dim=1024), nullable=True),
-    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('description_vector', pgvector.sqlalchemy.vector.VECTOR(dim=1024), nullable=True),
-    sa.Column('documentation', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('is_abstract', sa.Boolean(), nullable=False),
-    sa.Column('spec_id', sa.Integer(), nullable=False),
-    sa.Column('nodeset_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['nodeset_id'], ['nodeset.id'], ),
-    sa.ForeignKeyConstraint(['spec_id'], ['spec.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('expanded_node_id'),
-    sa.UniqueConstraint('expanded_node_id', 'nodeset_id', name='unique_datatype_expnodeid_nodeset')
     )
     op.create_table('nodeset_required_link',
     sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
@@ -165,7 +144,7 @@ def upgrade():
     sa.Column('modelling_rule_id', sa.Integer(), nullable=True),
     sa.Column('is_abstract', sa.Boolean(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['data_type_id'], ['data_type.id'], ),
+    sa.ForeignKeyConstraint(['data_type_id'], ['node.id'], ),
     sa.ForeignKeyConstraint(['modelling_rule_id'], ['modelling_rule.id'], ),
     sa.ForeignKeyConstraint(['node_class_id'], ['node_class.id'], ),
     sa.ForeignKeyConstraint(['nodeset_id'], ['nodeset.id'], ),
@@ -213,7 +192,6 @@ def downgrade():
     op.drop_table('spec_nodeset_link')
     op.drop_table('nodeset_requirement_helper')
     op.drop_table('nodeset_required_link')
-    op.drop_table('data_type')
     op.drop_table('unit')
     op.drop_table('spec')
     op.drop_table('nodeset')

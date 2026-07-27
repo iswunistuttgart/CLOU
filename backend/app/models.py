@@ -111,40 +111,6 @@ class NodesetRequiredHelper(Times, table=True):
     required_nodeset_version: str | None
 
 
-##### DataType #####
-class DataTypeBase(NodeBaseAttr, table=False):
-    id: int | None = Field(primary_key=True, default=None)
-    is_abstract: bool
-
-    spec_id: int = Field(foreign_key="spec.id")
-    nodeset_id: int = Field(foreign_key="nodeset.id")
-
-
-class DataType(DataTypeBase, Times, table=True):
-    __tablename__ = "data_type"
-    __table_args__ = (
-        UniqueConstraint('expanded_node_id', 'nodeset_id', name="unique_datatype_expnodeid_nodeset"),
-    )
-    spec: "Spec" = Relationship(back_populates="data_types")
-    nodeset: "Nodeset" = Relationship(back_populates="data_types")
-    nodes: list["Node"] = Relationship(back_populates="data_type")
-
-
-class DataTypeCreate(DataTypeBase, table=False):
-    pass
-
-class DataTypeUpdate(NodeBaseAttr, table=False):
-        is_abstract: bool
-
-
-class DataTypePublic(DataTypeBase, Times, table=False):
-    spec : "SpecPublic"
-    nodeset: "NodesetPublic"
-
-class DataTypePublicWithLists(DataTypePublic, table=False):
-    nodes: list["NodePublic"] = []
-
-
 ##### Modelling Rule #####
 class ModellingRuleEnum(str, Enum):
     mandatory = "M"
@@ -185,7 +151,7 @@ class NodeBase(NodeBaseAttr, table=False):
     typedefinition_expanded_node_id: str | None = None
     parent_id: int | None = Field(foreign_key="node.id", default=None)
     parent_expanded_node_id: str | None = None
-    data_type_id: int | None = Field(foreign_key="data_type.id", default=None)  # für Variable und VariableType
+    data_type_id: int | None = Field(foreign_key="node.id", default=None)  # für Variable und VariableType
     data_type_expanded_node_id: str | None = None
     unit_id: int | None = Field(foreign_key="unit.id", default=None)  # für Variable und VariableType
     modelling_rule_id: int | None = Field(foreign_key="modelling_rule.id", default=None)  # für Variable und Object
@@ -217,7 +183,10 @@ class Node(NodeBase, Times, table=True):
                                                     sa_relationship_kwargs={"remote_side": "Node.id", "foreign_keys": "Node.typedefinition_id"})
     typedefinition_of: list["Node"] | None = Relationship(back_populates="typedefinition",
                                                           sa_relationship_kwargs={"foreign_keys": "Node.typedefinition_id"})
-    data_type: Optional["DataType"] = Relationship(back_populates="nodes")  # für Variable und VariableType
+    data_type: Optional["Node"] = Relationship(back_populates="data_type_of",
+                                               sa_relationship_kwargs={"remote_side": "Node.id", "foreign_keys": "Node.data_type_id"})  # für Variable und VariableType
+    data_type_of: list["Node"] | None = Relationship(back_populates="data_type",
+                                                     sa_relationship_kwargs={"foreign_keys": "Node.data_type_id"})
     unit: Optional["Unit"] = Relationship(back_populates="nodes")  # für Variable und VariableType
     modelling_rule: Optional["ModellingRule"] = Relationship(back_populates="nodes")  # für Variable und Object
 
@@ -241,7 +210,7 @@ class NodePublic(NodeBase, Times, table=False):
     nodeset: "NodesetPublic"
     parent: Optional["NodePublicReference"]
     typedefinition: Optional["NodePublicReference"]
-    data_type: Optional["DataTypePublic"]
+    data_type: Optional["NodePublic"]
     unit: Optional["UnitPublic"]
     modelling_rule: Optional["ModellingRulePublic"]
 
@@ -254,7 +223,7 @@ class NodePublicReference(NodeBase, Times, table=False): #only flat hierarchy wi
     node_class : "NodeClassPublic"
     spec : Optional["SpecPublic"]
     nodeset : "NodesetPublic"
-    data_type: Optional["DataTypePublic"]
+    data_type: Optional["NodePublic"]
     unit: Optional["UnitPublic"]
     modelling_rule: Optional["ModellingRulePublic"]
 
@@ -306,7 +275,6 @@ class Nodeset(NodesetBase, Times, table=True):
     id: int | None = Field(default=None, primary_key=True)
     specs: list["Spec"] = Relationship(back_populates="nodesets", link_model=SpecNodesetLink)
     nodes: list["Node"] = Relationship(back_populates="nodeset", sa_relationship_kwargs={"primaryjoin": "Node.nodeset_id == Nodeset.id", "foreign_keys": "Node.nodeset_id"})
-    data_types: list["DataType"] = Relationship(back_populates="nodeset")
     required_nodesets: list["Nodeset"] = Relationship(back_populates="required_by_nodesets",
                                                       link_model=NodesetRequiredLink,
                                                       sa_relationship_kwargs={
@@ -348,7 +316,6 @@ class SpecBase(SQLModel, table=False):
 
 class Spec(SpecBase, Times, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    data_types: list["DataType"] = Relationship(back_populates="spec")
     nodes: list["Node"] = Relationship(back_populates="spec")
     nodesets: list["Nodeset"] = Relationship(back_populates="specs", link_model=SpecNodesetLink)
 
@@ -360,7 +327,7 @@ class SpecPublic(SpecBase, Times, table=False):
     id: int
 
 class SpecPublicWithLists(SpecPublic, table=False):
-    data_types: list["DataTypePublic"] = []
+    data_types: list["NodePublic"] = []
     nodes: list["NodePublic"] = []
     nodesets: list["NodesetPublic"] = []
 
@@ -400,7 +367,6 @@ class UpdateEntities(SQLModel, table=False):
      spec: SpecCreate
      nodeset: NodesetCreate 
      nodes: list[NodeUpdate]
-     datatype_nodes: list[DataTypeUpdate]
      required_nodesets: list[NodesetRequirementUpdate] = []
 
 class UpdateWarning(SQLModel, table=False):
