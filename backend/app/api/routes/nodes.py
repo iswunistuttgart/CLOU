@@ -132,6 +132,7 @@ def update_node(node_id: int,
 @router.get("/semantic_search/", response_model=List[NodeSemSearch])
 def semantic_search_nodes(q: str = Query(..., min_length=2),
                           nodeset_id: Optional[List[int]] = Query(None),
+                          node_class: Optional[List[NodeClassEnum]] = Query(None),
                           limit: int = Query(settings.NODE_SEARCH_LIMIT_DEFAULT, ge=1),
                           rrf_k: int = Query(settings.NODE_SEARCH_RRF_K_DEFAULT, ge=1),
                           session: SessionDep = None) -> list[NodeSemSearch]:
@@ -145,6 +146,23 @@ def semantic_search_nodes(q: str = Query(..., min_length=2),
     lexical_candidate_limit = max(limit * settings.NODE_SEARCH_LEX_MULTIPLIER, limit)
     dense_candidate_limit = max(limit * settings.NODE_SEARCH_DENSE_MULTIPLIER, limit)
     trigram_candidate_limit = max(limit * settings.NODE_SEARCH_TRIGRAM_MULTIPLIER, limit)
+
+    def _apply_semantic_search_filters(
+            query, 
+            nodeset_id: Optional[List[int]],
+            node_class: Optional[List[NodeClassEnum]]
+    ):
+        if nodeset_id is not None:
+            query = query.where(Node.nodeset_id.in_(nodeset_id))
+
+        if node_class is not None:
+            node_class_id_subquery = (
+                select(NodeClass.id)
+                .where(NodeClass.node_class.in_(node_class))
+            )
+            query = query.where(Node.node_class_id.in_(node_class_id_subquery))
+
+        return query
 
     # ---------------------------------------
     # 1. Lexical Search using BM25 (ParadeDB)
@@ -168,8 +186,7 @@ def semantic_search_nodes(q: str = Query(..., min_length=2),
     )
     
     # Second where statement: optional numeric filter on nodeset_id
-    if nodeset_id is not None:
-        query_lex = query_lex.where(Node.nodeset_id.in_(nodeset_id))
+    query_lex = _apply_semantic_search_filters(query_lex, nodeset_id, node_class)
     
     # Now add ordering and limit
     query_lex = query_lex.order_by(text("bm25_score DESC")).limit(lexical_candidate_limit)
@@ -196,8 +213,7 @@ def semantic_search_nodes(q: str = Query(..., min_length=2),
             .where(trigram_score >= settings.NODE_SEARCH_TRIGRAM_THRESHOLD)
         )
 
-        if nodeset_id is not None:
-            query_trigram = query_trigram.where(Node.nodeset_id.in_(nodeset_id))
+        query_trigram = _apply_semantic_search_filters(query_trigram, nodeset_id, node_class)
 
         query_trigram = query_trigram.order_by(text("trgm_score DESC")).limit(trigram_candidate_limit)
         res_trigram = session.exec(query_trigram).all()
@@ -237,26 +253,35 @@ def semantic_search_nodes(q: str = Query(..., min_length=2),
         query_dense_display_name = (
             select(Node, sim_display_name)
             .where(text("display_name_vector IS NOT NULL"))
-            .order_by(sim_display_name.desc())
-            .limit(dense_candidate_limit)
         )
         query_dense_def = (
             select(Node, sim_def)
             .where(text("definition_vector IS NOT NULL"))
-            .order_by(sim_def.desc())
-            .limit(dense_candidate_limit)
         )
         query_dense_desc = (
             select(Node, sim_desc)
             .where(text("description_vector IS NOT NULL"))
+        )
+
+        query_dense_display_name = _apply_semantic_search_filters(query_dense_display_name, nodeset_id, node_class)
+        query_dense_def = _apply_semantic_search_filters(query_dense_def, nodeset_id, node_class)
+        query_dense_desc = _apply_semantic_search_filters(query_dense_desc, nodeset_id, node_class)
+
+        query_dense_display_name = (
+            query_dense_display_name
+            .order_by(sim_display_name.desc())
+            .limit(dense_candidate_limit)
+        )
+        query_dense_def = (
+            query_dense_def
+            .order_by(sim_def.desc())
+            .limit(dense_candidate_limit)
+        )
+        query_dense_desc = (
+            query_dense_desc
             .order_by(sim_desc.desc())
             .limit(dense_candidate_limit)
         )
-
-        if nodeset_id is not None:
-            query_dense_display_name = query_dense_display_name.where(Node.nodeset_id.in_(nodeset_id))
-            query_dense_def = query_dense_def.where(Node.nodeset_id.in_(nodeset_id))
-            query_dense_desc = query_dense_desc.where(Node.nodeset_id.in_(nodeset_id))
 
         res_dense_display_name = session.exec(query_dense_display_name).all()
         res_dense_def = session.exec(query_dense_def).all()

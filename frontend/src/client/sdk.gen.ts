@@ -342,6 +342,8 @@ export class NodesService {
      * @param data.id
      * @param data.displayName
      * @param data.expandedNodeId
+    * @param data.nodeClass
+    * @param data.nodesetUri
      * @returns NodePublic Successful Response
      * @throws ApiError
      */
@@ -352,7 +354,9 @@ export class NodesService {
             query: {
                 id: data.id,
                 display_name: data.displayName,
-                expanded_node_id: data.expandedNodeId
+                expanded_node_id: data.expandedNodeId,
+                node_class: data.nodeClass,
+                nodeset_uri: data.nodesetUri
             },
             errors: {
                 422: 'Validation Error'
@@ -383,7 +387,9 @@ export class NodesService {
      * Semantic Search Nodes
      * @param data The data for the request.
      * @param data.q
+    * @param data.nodesetId
      * @param data.specId
+    * @param data.nodeClass
      * @param data.limit
      * @param data.rrfK
      * @returns NodeSemSearch Successful Response
@@ -395,7 +401,8 @@ export class NodesService {
             url: '/api/v1/nodes/semantic_search/',
             query: {
                 q: data.q,
-                spec_id: data.specId,
+                nodeset_id: data.nodesetId ?? data.specId,
+                node_class: data.nodeClass,
                 limit: data.limit,
                 rrf_k: data.rrfK
             },

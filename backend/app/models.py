@@ -144,9 +144,9 @@ class ModellingRulePublicWithLists(ModellingRulePublic, table=False):
 
 ##### Node #####
 class NodeBase(NodeBaseAttr, table=False):
-    node_class_id: int = Field(foreign_key="node_class.id")
+    node_class_id: int = Field(foreign_key="node_class.id", index=True)
     spec_id: int | None = Field(foreign_key="spec.id")
-    nodeset_id: int = Field(foreign_key="nodeset.id")
+    nodeset_id: int = Field(foreign_key="nodeset.id", index=True)
     typedefinition_id: int | None = Field(foreign_key="node.id", default=None)
     typedefinition_expanded_node_id: str | None = None
     parent_id: int | None = Field(foreign_key="node.id", default=None)

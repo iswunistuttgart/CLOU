@@ -480,6 +480,8 @@ export type NodesReadNodesData = {
     displayName?: (string | null);
     expandedNodeId?: (string | null);
     id?: (number | null);
+    nodeClass?: (string | null);
+    nodesetUri?: (string | null);
 };
 
 export type NodesReadNodesResponse = (Array<NodePublic>);
@@ -492,9 +494,11 @@ export type NodesCreateNodeResponse = (NodePublic);
 
 export type NodesSemanticSearchNodesData = {
     limit?: number;
+    nodeClass?: Array<string>;
+    nodesetId?: Array<number>;
     q: string;
     rrfK?: number;
-    specId?: number;
+    specId?: Array<number>;
 };
 
 export type NodesSemanticSearchNodesResponse = (Array<NodeSemSearch>);

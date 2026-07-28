@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.*/
 
 
-import { LuTag, LuBox, LuSquareMenu } from 'react-icons/lu'
+import { LuTag, LuBox, LuBoxes, LuBraces, LuMessageCircle } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 
 /**
@@ -25,11 +25,14 @@ export function getNodeIcon(nodeClass: string): IconType {
   switch (nodeClass) {
     case 'Variable':
       return LuTag
-    case 'Property':
-      return LuSquareMenu
     case 'Object':
-    case 'ObjectType':
       return LuBox
+    case 'ObjectType':
+      return LuBoxes
+    case 'DataType':
+      return LuBraces
+    case 'Method':
+      return LuMessageCircle
     default:
       return LuBox
   }

@@ -156,6 +156,19 @@ def upgrade():
     sa.UniqueConstraint('expanded_node_id')
     )
     op.create_index('ix_node_bm25', 'node', ['id', 'display_name', 'definition', 'description', 'documentation'], unique=False, postgresql_using='bm25', postgresql_with={'key_field': 'id'})
+    op.create_index(
+        "ix_node_node_class_id",
+        "node",
+        ["node_class_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_node_nodeset_id",
+        "node",
+        ["nodeset_id"],
+        unique=False,
+    )
+
 
     op.execute("DROP EXTENSION IF EXISTS postgis_tiger_geocoder")
     op.execute("DROP EXTENSION IF EXISTS postgis_topology")

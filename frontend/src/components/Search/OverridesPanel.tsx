@@ -42,11 +42,11 @@ interface ChangeSummary {
 
 type AnalysisMode = 'type' | 'member'
 
-const TYPE_NODE_TYPES = new Set(['ObjectType', 'VariableType'])
+const TYPE_NODE_CLASSES = new Set(['ObjectType', 'VariableType'])
 
 function isTypeNode(node: Partial<OPCUANode>): boolean {
-  const nodeType = node.node_type?.node_type
-  return nodeType ? TYPE_NODE_TYPES.has(nodeType) : false
+  const nodeClass = node.node_class?.node_class
+  return nodeClass ? TYPE_NODE_CLASSES.has(nodeClass) : false
 }
 
 function getNodeIdPart(expandedNodeId?: string): string {
@@ -68,8 +68,8 @@ function getDisplayName(node: Partial<OPCUANode>): string | null {
 function getComponents(node: Partial<OPCUANode>): Partial<OPCUANode>[] {
   const children = Array.isArray(node.children) ? node.children : []
   return children.filter((child) => {
-    const nodeType = child.node_type?.node_type
-    return !nodeType || !TYPE_NODE_TYPES.has(nodeType)
+    const nodeClass = child.node_class?.node_class
+    return !nodeClass || !TYPE_NODE_CLASSES.has(nodeClass)
   })
 }
 
@@ -106,7 +106,7 @@ function getChangeSummary(currentNode?: Partial<OPCUANode>, ancestorNode?: Parti
     { label: 'Description', current: currentNode.description, ancestor: ancestorNode.description },
     { label: 'Definition', current: currentNode.definition, ancestor: ancestorNode.definition },
     { label: 'Documentation', current: currentNode.documentation, ancestor: ancestorNode.documentation },
-    { label: 'Node type', current: currentNode.node_type?.node_type, ancestor: ancestorNode.node_type?.node_type },
+    { label: 'Node type', current: currentNode.node_class?.node_class, ancestor: ancestorNode.node_class?.node_class },
     { label: 'Data type', current: currentNode.data_type?.display_name ?? currentNode.data_type?.id, ancestor: ancestorNode.data_type?.display_name ?? ancestorNode.data_type?.id },
     { label: 'Unit', current: currentNode.unit?.display_name ?? currentNode.unit?.id, ancestor: ancestorNode.unit?.display_name ?? ancestorNode.unit?.id },
     { label: 'Modelling rule', current: currentNode.modelling_rule?.rule ?? currentNode.modelling_rule?.id, ancestor: ancestorNode.modelling_rule?.rule ?? ancestorNode.modelling_rule?.id },
