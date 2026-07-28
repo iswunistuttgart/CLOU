@@ -33,12 +33,11 @@ export function useAggChartData(csv: string) {
 
         select: (data: AggCsvRow[]): AggChartData[] => {
             return data
-                .slice(0, -1)
                 .map((row) => ({
                     name: row.browsename.replace(/_[^_]+$/, ''),
                     numberOfChildren: Number(row.number_of_children),
                     sizeOfSubtree: Number(row.size_of_subtree),
-                    nodeId: row.browsename.split("_")[1],
+                    nodeId: row.browsename.split('_')[row.browsename.split('_').length - 1],
                     breadthOfSubtree: Number(row.breadth_of_subtree),
                     depthOfSubtree: Number(row.depth_of_subtree),
                     nsAggregationScore: Number(row.ns_aggregation_score)

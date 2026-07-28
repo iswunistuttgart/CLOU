@@ -23,7 +23,6 @@ function useCatChartData(csv: string) {
         csv,
         select: (rows: CategoryCsvRow[]): CategoryData[] => {
             return rows
-                .slice(0, -1)
                 .map((row) => {
                     const browseNames = row.browsenames
                         .replace(/^\[|\]$/g, "")

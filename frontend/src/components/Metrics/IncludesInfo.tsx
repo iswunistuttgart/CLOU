@@ -24,7 +24,7 @@ function useInclChartData(csv: string) {
   const nodes = new Map<string, IncludedNode>();
   const foreignNamespaces = new Set<string>();
 
-  rows.slice(0, -1).forEach((row) => {
+  rows.forEach((row) => {
     foreignNamespaces.add(row.foreign_namespace);
 
     let node = nodes.get(row.nodeid);

@@ -38,7 +38,7 @@ export function useDITChartData(csv: string) {
         DataType: {},
       };
 
-      data.slice(0, -1).forEach((row) => {
+      data.forEach((row) => {
         const nodeclass = row.nodeclass;
 
         // nur erlaubte Klassen
