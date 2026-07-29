@@ -117,6 +117,7 @@ class ModellingRuleEnum(str, Enum):
     optional = "O"
     mandatory_placeholder = "MP"
     optional_placeholder = "OP"
+    exposes_its_array = "EIA"
 
 
 class ModellingRuleBase(SQLModel, table=False):

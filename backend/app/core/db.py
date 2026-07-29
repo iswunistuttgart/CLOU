@@ -168,6 +168,7 @@ def create_initial_values() -> None:
             80: ModellingRuleEnum.optional.value,
             11510: ModellingRuleEnum.mandatory_placeholder.value,
             11508: ModellingRuleEnum.optional_placeholder.value,
+            83: ModellingRuleEnum.exposes_its_array.value
         }
         for rule_id, rule_value in modelling_rules_seed.items():
             if session.get(ModellingRule, rule_id) is None:

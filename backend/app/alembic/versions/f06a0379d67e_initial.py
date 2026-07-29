@@ -40,7 +40,7 @@ def upgrade():
     sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
     sa.Column('update_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('rule', sa.Enum('mandatory', 'optional', 'mandatory_placeholder', 'optional_placeholder', name='modellingruleenum'), nullable=False),
+    sa.Column('rule', sa.Enum('mandatory', 'optional', 'mandatory_placeholder', 'optional_placeholder', 'exposes_its_array', name='modellingruleenum'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('rule')
     )
