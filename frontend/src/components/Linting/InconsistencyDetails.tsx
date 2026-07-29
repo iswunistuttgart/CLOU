@@ -130,9 +130,10 @@ export function InconsistencyDetails ({ element, }: LintingResultsProps)
         csv: missingCategoriesCsv,
         select: (data:MissingInfoRow[]) : MissingInfoRow[] =>
             data.map((row) => ({
-            browsename: row.browsename,
-            nodeid: row.nodeid,
-            })),
+                browsename: row.browsename,
+                nodeid: row.nodeid,
+            }))
+            .sort((a, b) => a.browsename.localeCompare(b.browsename)),
         });
 
     const { data: ootRows = []} = useCsvData<OutOfTypesRow[]>({
@@ -142,7 +143,8 @@ export function InconsistencyDetails ({ element, }: LintingResultsProps)
                 nodeid: row.nodeid,
                 browsename: row.browsename,
                 sizeofsubtree: Number(row.sizeofsubtree)
-            })),
+            }))
+            .sort((a, b) => b.sizeofsubtree - a.sizeofsubtree),
     });
 
     const { data: dRows = [] } = useCsvData<MissingInfoRow[]>({
@@ -151,7 +153,8 @@ export function InconsistencyDetails ({ element, }: LintingResultsProps)
             data.map((row) => ({
                 browsename: row.browsename,
                 nodeid: row.nodeid,
-            })),
+            }))
+            .sort((a, b) => a.browsename.localeCompare(b.browsename)),
     });
 
     const { data: eRows = [] } = useCsvData<MissingInfoRow[]>({
@@ -160,7 +163,8 @@ export function InconsistencyDetails ({ element, }: LintingResultsProps)
             data.map((row) => ({
                 browsename: row.browsename,
                 nodeid: row.nodeid,
-            })),
+            }))
+            .sort((a, b) => a.browsename.localeCompare(b.browsename)),
     });
 
     const { data: aRows = [] } = useCsvData<AccessLevelRow[]>({
@@ -170,7 +174,8 @@ export function InconsistencyDetails ({ element, }: LintingResultsProps)
                 browsename: row.browsename,
                 nodeid: row.nodeid,
                 accesslevel: row.accesslevel,
-            })),
+            }))
+            .sort((a, b) => a.browsename.localeCompare(b.browsename)),
     });
 
 
