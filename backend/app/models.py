@@ -153,7 +153,6 @@ class NodeBase(NodeBaseAttr, table=False):
     parent_expanded_node_id: str | None = None
     data_type_id: int | None = Field(foreign_key="node.id", default=None)  # für Variable und VariableType
     data_type_expanded_node_id: str | None = None
-    unit_id: int | None = Field(foreign_key="unit.id", default=None)  # für Variable und VariableType
     modelling_rule_id: int | None = Field(foreign_key="modelling_rule.id", default=None)  # für Variable und Object
     is_abstract: bool | None = Field(default=None)  # für VariableType und ObjectType
 
@@ -187,7 +186,6 @@ class Node(NodeBase, Times, table=True):
                                                sa_relationship_kwargs={"remote_side": "Node.id", "foreign_keys": "Node.data_type_id"})  # für Variable und VariableType
     data_type_of: list["Node"] | None = Relationship(back_populates="data_type",
                                                      sa_relationship_kwargs={"foreign_keys": "Node.data_type_id"})
-    unit: Optional["Unit"] = Relationship(back_populates="nodes")  # für Variable und VariableType
     modelling_rule: Optional["ModellingRule"] = Relationship(back_populates="nodes")  # für Variable und Object
 
 
@@ -199,9 +197,8 @@ class NodeUpdate(NodeBaseAttr, table=False):
     typedefinition_expanded_node_id: str | None = None
     parent_expanded_node_id: str | None = None
     data_type_expanded_node_id: str | None = None  # für Variable und VariableType
-    unit_id: int | None = None # für Variable und VariableType
     modelling_rule_id: int | None = None # für Variable und Object
-    is_abstract: bool | None = None # für VariableType und ObjectType
+    is_abstract: bool | None = None # für VariableType und ObjectType und DataType
 
 class NodePublic(NodeBase, Times, table=False):
     id: int
@@ -211,7 +208,6 @@ class NodePublic(NodeBase, Times, table=False):
     parent: Optional["NodePublicReference"]
     typedefinition: Optional["NodePublicReference"]
     data_type: Optional["NodePublic"]
-    unit: Optional["UnitPublic"]
     modelling_rule: Optional["ModellingRulePublic"]
 
 class NodePublicWithLists(NodePublic, table=False):
@@ -224,7 +220,6 @@ class NodePublicReference(NodeBase, Times, table=False): #only flat hierarchy wi
     spec : Optional["SpecPublic"]
     nodeset : "NodesetPublic"
     data_type: Optional["NodePublic"]
-    unit: Optional["UnitPublic"]
     modelling_rule: Optional["ModellingRulePublic"]
 
 class NodeSemSearch(SQLModel, table=False):
@@ -334,28 +329,6 @@ class SpecPublicWithLists(SpecPublic, table=False):
 class SpecSemSearch(SQLModel, table=False):
     spec: SpecPublic
     similarity: float
-
-
-##### Unit #####
-class UnitBase(SQLModel, table=False):
-    id: int = Field(primary_key=True)  # aus Mappingtabelle
-    unece_code: str = Field(unique=True)
-    display_name: str
-    description: str
-
-
-class Unit(UnitBase, Times, table=True):
-    nodes: list["Node"] = Relationship(back_populates="unit")
-
-class UnitCreate(UnitBase, table=False):
-    pass
-
-
-class UnitPublic(UnitBase, Times, table=False):
-    pass
-
-class UnitPublicWithLists(UnitPublic, table=False):
-    nodes: list["NodePublic"] = []
     
 
 #### Update Nodes, Specs and Nodesets ####

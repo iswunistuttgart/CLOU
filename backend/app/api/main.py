@@ -16,8 +16,6 @@
 from app.api.routes import modelling_rules, nodes, nodeset_required, nodesets, spec_nodeset_link, specs, metrics, utils, linting, update_entries
 from fastapi import APIRouter
 
-from app.api.routes import units
-
 api_router = APIRouter()
 
 api_router.include_router(nodes.router)
@@ -25,7 +23,6 @@ api_router.include_router(nodesets.router)
 api_router.include_router(nodeset_required.router)
 api_router.include_router(spec_nodeset_link.router)
 api_router.include_router(specs.router)
-api_router.include_router(units.router)
 api_router.include_router(modelling_rules.router)
 api_router.include_router(update_entries.router)
 api_router.include_router(metrics.router)

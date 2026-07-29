@@ -392,7 +392,7 @@ export function SearchWindow({
 
             <Flex {...S.filterBar}>
               <FilterPopover
-                label="Specs"
+                label="Nodeset"
                 options={companionSpecsOptions.map((option) => ({
                   key: option.key,
                   label: option.label,
@@ -403,7 +403,7 @@ export function SearchWindow({
                 withSelectAll={true}
               />
               <FilterPopover
-                label="Nodes"
+                label="NodeClass"
                 options={nodeClassOptions}
                 selectedKeys={selectedNodeClassKeys}
                 onSelectionChange={setSelectedNodeClassKeys}

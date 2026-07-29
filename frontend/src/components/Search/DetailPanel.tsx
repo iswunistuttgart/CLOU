@@ -20,6 +20,7 @@ import { getNodeIcon } from './iconUtils'
 import type { OPCUAElement, OPCUANode } from './types'
 import { CopyButton } from './CopyButton'
 import { useState } from 'react'
+import { FormattedDefinition } from './FormattedDefinition'
 
 interface DetailPanelProps {
   selectedElement: OPCUAElement | null
@@ -125,7 +126,7 @@ export function DetailPanel({ selectedElement }: DetailPanelProps) {
               {node.description}
             </Text>
             <Text {...S.descText}>
-              {node.definition}
+              <FormattedDefinition text={node.definition} />
             </Text>
           </Card.Body>
         </Card.Root>

@@ -79,16 +79,6 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('number')
     )
-    op.create_table('unit',
-    sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('update_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('unece_code', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('display_name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('unece_code')
-    )
     op.create_table('nodeset_required_link',
     sa.Column('create_time', sa.DateTime(timezone=True), nullable=True),
     sa.Column('update_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
@@ -140,7 +130,6 @@ def upgrade():
     sa.Column('parent_expanded_node_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('data_type_id', sa.Integer(), nullable=True),
     sa.Column('data_type_expanded_node_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('unit_id', sa.Integer(), nullable=True),
     sa.Column('modelling_rule_id', sa.Integer(), nullable=True),
     sa.Column('is_abstract', sa.Boolean(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
@@ -151,7 +140,6 @@ def upgrade():
     sa.ForeignKeyConstraint(['parent_id'], ['node.id'], ),
     sa.ForeignKeyConstraint(['spec_id'], ['spec.id'], ),
     sa.ForeignKeyConstraint(['typedefinition_id'], ['node.id'], ),
-    sa.ForeignKeyConstraint(['unit_id'], ['unit.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('expanded_node_id')
     )
@@ -205,7 +193,6 @@ def downgrade():
     op.drop_table('spec_nodeset_link')
     op.drop_table('nodeset_requirement_helper')
     op.drop_table('nodeset_required_link')
-    op.drop_table('unit')
     op.drop_table('spec')
     op.drop_table('nodeset')
     op.drop_table('node_class')
