@@ -30,7 +30,7 @@ project_root="$(dirname "$filedir")"
 
 ### SET Variables
 BACKUP_DIR="$project_root/data" 
-POSTGRES_CONTAINER_NAME="${POSTGRES_CONTAINER_NAME:-backend-db-1}"
+POSTGRES_CONTAINER_NAME="${POSTGRES_CONTAINER_NAME:-clou-db-1}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-app}"

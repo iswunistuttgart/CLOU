@@ -36,10 +36,8 @@ DATABASE_INIT_LOCK_ID = 20260706
 REQUIRED_SEEDED_TABLES = (
     "nodeset",
     "spec",
-    "data_type",
     "modelling_rule",
     "node_class",
-    "unit",
     "node",
     "nodeset_required_link",
     "spec_nodeset_link",
@@ -63,6 +61,27 @@ def _get_incomplete_seed_tables() -> list[str]:
                 incomplete_tables.append(table_name)
 
     return incomplete_tables
+
+def _truncate_seed_tables(logger: logging.Logger) -> None:
+    existing_tables = []
+    with engine.connect() as conn:
+        for table_name in REQUIRED_SEEDED_TABLES:
+            exists = conn.execute(
+                text(f"SELECT to_regclass('public.{table_name}') IS NOT NULL")
+            ).scalar()
+            if exists:
+                existing_tables.append(table_name)
+
+        if existing_tables:
+            conn.execute(
+                text(
+                    "TRUNCATE TABLE "
+                    + ", ".join(f"public.{t}" for t in existing_tables)
+                    + " RESTART IDENTITY CASCADE;"
+                )
+            )
+            conn.commit()
+    logger.info("Seed-Tabellen vor Restore geleert: %s", ", ".join(existing_tables))
 
 
 def _database_already_seeded() -> bool:
@@ -218,6 +237,8 @@ def load_sql_backup(
 
     logger.info(f"Attempting to load SQL backup from {sql_file_path}...")
 
+    _truncate_seed_tables(logger=logger)
+
     # Prepare environment variables for psql, especially PGPASSWORD
     env = os.environ.copy()
     env["PGPASSWORD"] = settings.POSTGRES_PASSWORD
@@ -309,78 +330,89 @@ def load_sql_backup(
 def ensure_node_search_db_artifacts(logger=logging.getLogger("app.db")) -> None:
     """Ensure node search extensions and indexes exist, independent of Alembic history."""
     with engine.connect() as conn:
-        # Extensions are safe to call repeatedly.
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent;"))
+        logger.info("Waiting for node-search artifacts lock...")
+        conn.execute(
+            text("SELECT pg_advisory_lock(:lock_id)"),
+            {"lock_id": DATABASE_INIT_LOCK_ID},
+        )
+        try:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent;"))
 
-        node_table_exists = conn.execute(
-            text("SELECT to_regclass('public.node') IS NOT NULL")
-        ).scalar()
+            node_table_exists = conn.execute(
+                text("SELECT to_regclass('public.node') IS NOT NULL")
+            ).scalar()
 
-        if not node_table_exists:
-            logger.warning("Node table not found; skipping node search index creation.")
-            conn.commit()
-            return
+            if not node_table_exists:
+                logger.warning("Node table not found; skipping node search index creation.")
+                conn.commit()
+                return
 
-        conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_node_nodeset_id ON node (nodeset_id);")
-        )
-        conn.execute(
-            text(
-                """
-                CREATE INDEX IF NOT EXISTS ix_node_display_name_lower_trgm
-                ON node
-                USING gin (lower(display_name) gin_trgm_ops);
-                """
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_node_nodeset_id ON node (nodeset_id);")
             )
-        )
-        conn.execute(
-            text(
-                """
-                CREATE INDEX IF NOT EXISTS ix_node_definition_vector_ivfflat
-                ON node
-                USING ivfflat (definition_vector vector_cosine_ops)
-                WITH (lists = 100)
-                WHERE definition_vector IS NOT NULL;
-                """
-            )
-        )
-        conn.execute(
-            text(
-                """
-                CREATE INDEX IF NOT EXISTS ix_node_description_vector_ivfflat
-                ON node
-                USING ivfflat (description_vector vector_cosine_ops)
-                WITH (lists = 100)
-                WHERE description_vector IS NOT NULL;
-                """
-            )
-        )
-        display_name_vector_exists = conn.execute(
-            text(
-                """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name = 'node'
-                      AND column_name = 'display_name_vector'
-                );
-                """
-            )
-        ).scalar()
-        if display_name_vector_exists:
             conn.execute(
                 text(
                     """
-                    CREATE INDEX IF NOT EXISTS ix_node_display_name_vector_ivfflat
+                    CREATE INDEX IF NOT EXISTS ix_node_display_name_lower_trgm
                     ON node
-                    USING ivfflat (display_name_vector vector_cosine_ops)
-                    WITH (lists = 100)
-                    WHERE display_name_vector IS NOT NULL;
+                    USING gin (lower(display_name) gin_trgm_ops);
                     """
                 )
             )
-        conn.commit()
-        logger.info("Node search DB artifacts ensured (extensions + indexes).")
+            conn.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_node_definition_vector_ivfflat
+                    ON node
+                    USING ivfflat (definition_vector vector_cosine_ops)
+                    WITH (lists = 100)
+                    WHERE definition_vector IS NOT NULL;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_node_description_vector_ivfflat
+                    ON node
+                    USING ivfflat (description_vector vector_cosine_ops)
+                    WITH (lists = 100)
+                    WHERE description_vector IS NOT NULL;
+                    """
+                )
+            )
+            display_name_vector_exists = conn.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                        AND table_name = 'node'
+                        AND column_name = 'display_name_vector'
+                    );
+                    """
+                )
+            ).scalar()
+            if display_name_vector_exists:
+                conn.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS ix_node_display_name_vector_ivfflat
+                        ON node
+                        USING ivfflat (display_name_vector vector_cosine_ops)
+                        WITH (lists = 100)
+                        WHERE display_name_vector IS NOT NULL;
+                        """
+                    )
+                )
+            conn.commit()
+            logger.info("Node search DB artifacts ensured (extensions + indexes).")
+        finally:
+            conn.execute(
+                text("SELECT pg_advisory_unlock(:lock_id)"),
+                {"lock_id": DATABASE_INIT_LOCK_ID},
+            )
+            conn.commit()
