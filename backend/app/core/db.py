@@ -17,6 +17,7 @@ import os
 import subprocess
 import logging
 import shutil
+import zipfile
 from pathlib import Path
 from sqlalchemy import text
 from alembic.config import Config
