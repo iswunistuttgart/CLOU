@@ -14,9 +14,8 @@
 
 
 from fastapi import APIRouter, HTTPException
-from sqlmodel import select
-from typing import Optional
 
+from sqlmodel import select
 
 from app.models import ModellingRule, ModellingRulePublic
 from app.api.deps import SessionDep
@@ -32,5 +31,7 @@ def read_modelling_rule(modelling_rule_id: int, session: SessionDep) -> Modellin
         raise HTTPException(status_code=404, detail="ModellingRule not found")
     return modelling_rule
 
-
-
+@router.get("/")
+def read_modelling_rules(session: SessionDep) -> list[ModellingRulePublic]:
+    modelling_rules = session.exec(select(ModellingRule)).all()
+    return modelling_rules

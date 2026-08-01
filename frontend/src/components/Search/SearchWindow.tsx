@@ -65,7 +65,7 @@ function parseDefaultSelectedSpecs(): string[] {
 }
 
 const DEFAULT_SELECTED_SPECS = parseDefaultSelectedSpecs()
-const DEFAULT_NODE_TYPES = ["Object", "Variable", "Property"]
+const DEFAULT_NODE_CLASSES = ["ObjectType", "VariableType", "Object", "Variable", "Method", "DataType"]
 type DetailsTab = "details" | "inheritance" | "overrides"
 
 function getApiBaseUrl(): string {
@@ -99,8 +99,8 @@ function buildSpecKey(label: string): string {
   return `spec:${label.toLowerCase()}`
 }
 
-function mapNodeTypesToOptions(nodeTypes: string[]): FilterOption[] {
-  return nodeTypes.map((nodeType) => ({ key: nodeType, label: nodeType }))
+function mapNodeClassesToOptions(nodeClasses: string[]): FilterOption[] {
+  return nodeClasses.map((nodeClass) => ({ key: nodeClass, label: nodeClass }))
 }
 
 function aggregateSpecOptions(
@@ -155,7 +155,7 @@ function aggregateSpecOptions(
 export async function searchApiCall(
   query: string,
   nodesetIds: number[],
-  nodeTypes: string[],
+  nodeClasses: string[],
 ): Promise<OPCUAElement[]> {
   try {
     const params = new URLSearchParams()
@@ -166,9 +166,9 @@ export async function searchApiCall(
       }
     }
 
-    if (nodeTypes?.length) {
-      for (const nodeType of nodeTypes) {
-        params.append("node_types", nodeType)
+    if (nodeClasses?.length) {
+      for (const nodeClass of nodeClasses) {
+        params.append("node_class", nodeClass)
       }
     }
 
@@ -217,7 +217,7 @@ export async function getNodeById(nodeId: number): Promise<OPCUANode | null> {
 export function SearchWindow({
   onSearch,
   defaultSelectedSpecs = DEFAULT_SELECTED_SPECS,
-  defaultNodeTypes = DEFAULT_NODE_TYPES,
+  defaultNodeClasses = DEFAULT_NODE_CLASSES,
   height = "100%",
 }: OPCUASearchWindowProps) {
   const [selectedElement, setSelectedElement] = useState<OPCUAElement | null>(
@@ -225,8 +225,8 @@ export function SearchWindow({
   )
   const [searchResults, setSearchResults] = useState<OPCUAElement[]>([])
   const [selectedSpecKeys, setSelectedSpecKeys] = useState<string[]>([])
-  const [selectedNodeTypes, setSelectedNodeTypes] =
-    useState<string[]>(defaultNodeTypes)
+  const [selectedNodeClasses, setSelectedNodeClasses] =
+    useState<string[]>(defaultNodeClasses)
   const [activeDetailsTab, setActiveDetailsTab] = useState<DetailsTab>("details")
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
@@ -235,8 +235,8 @@ export function SearchWindow({
   const [companionSpecsOptions, setCompanionSpecsOptions] = useState<
     SpecFilterOption[]
   >([])
-  const NODE_TYPES = ["Object", "Variable", "Property"]
-  const nodeTypeOptions = mapNodeTypesToOptions(NODE_TYPES)
+  const NODE_CLASSES = ["ObjectType", "VariableType", "Object", "Variable", "Method", "DataType"]
+  const nodeClassOptions = mapNodeClassesToOptions(NODE_CLASSES)
   const trimmedSearchQuery = searchQuery.trim()
 
   useEffect(() => {
@@ -314,7 +314,7 @@ export function SearchWindow({
       const results = await onSearch(
         trimmedSearchQuery,
         selectedNodesetIds,
-        selectedNodeTypes,
+        selectedNodeClasses,
       )
       if (searchRequestIdRef.current === requestId) {
         setSearchResults(results)
@@ -326,7 +326,7 @@ export function SearchWindow({
         setIsSearching(false)
       }
     }
-  }, [onSearch, selectedNodeTypes, selectedNodesetIds, trimmedSearchQuery])
+  }, [onSearch, selectedNodeClasses, selectedNodesetIds, trimmedSearchQuery])
 
   useEffect(() => {
     if (!trimmedSearchQuery) return
@@ -352,10 +352,10 @@ export function SearchWindow({
   const getSpecLabelByKey = (key: string) =>
     companionSpecsOptions.find((spec) => spec.key === key)?.label ?? key
 
-  const selectedNodeTypeKeys = selectedNodeTypes
+  const selectedNodeClassKeys = selectedNodeClasses
 
-  const setSelectedNodeTypeKeys = (keys: string[]) => {
-    setSelectedNodeTypes(keys)
+  const setSelectedNodeClassKeys = (keys: string[]) => {
+    setSelectedNodeClasses(keys)
   }
 
   const handleSelectNodeById = useCallback(async (nodeId: number) => {
@@ -392,7 +392,7 @@ export function SearchWindow({
 
             <Flex {...S.filterBar}>
               <FilterPopover
-                label="Specs"
+                label="Nodeset"
                 options={companionSpecsOptions.map((option) => ({
                   key: option.key,
                   label: option.label,
@@ -403,10 +403,10 @@ export function SearchWindow({
                 withSelectAll={true}
               />
               <FilterPopover
-                label="Nodes"
-                options={nodeTypeOptions}
-                selectedKeys={selectedNodeTypeKeys}
-                onSelectionChange={setSelectedNodeTypeKeys}
+                label="NodeClass"
+                options={nodeClassOptions}
+                selectedKeys={selectedNodeClassKeys}
+                onSelectionChange={setSelectedNodeClassKeys}
                 withSelectAll={true}
               />
             </Flex>

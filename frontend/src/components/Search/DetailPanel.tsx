@@ -20,6 +20,7 @@ import { getNodeIcon } from './iconUtils'
 import type { OPCUAElement, OPCUANode } from './types'
 import { CopyButton } from './CopyButton'
 import { useState } from 'react'
+import { FormattedDefinition } from './FormattedDefinition'
 
 interface DetailPanelProps {
   selectedElement: OPCUAElement | null
@@ -46,7 +47,7 @@ export function DetailPanel({ selectedElement }: DetailPanelProps) {
 
   const node: OPCUANode = selectedElement.node;
   // Select icon based on node type
-  const Icon = getNodeIcon(node.node_type.node_type)
+  const Icon = getNodeIcon(node.node_class.node_class)
 
   const specVerStr = node?.spec?.version != null ? String(node.spec.version) : '';
   const nodesetVerStr = node?.nodeset?.version != null ? String(node.nodeset.version) : '';
@@ -86,7 +87,7 @@ export function DetailPanel({ selectedElement }: DetailPanelProps) {
                 {node.display_name}
               </Heading>
               <Badge {...S.detailBadge}>
-                {node.node_type.node_type}
+                {node.node_class.node_class}
               </Badge>
             </Flex>
             <Flex>
@@ -125,7 +126,7 @@ export function DetailPanel({ selectedElement }: DetailPanelProps) {
               {node.description}
             </Text>
             <Text {...S.descText}>
-              {node.definition}
+              <FormattedDefinition text={node.definition} />
             </Text>
           </Card.Body>
         </Card.Root>
@@ -164,7 +165,7 @@ export function DetailPanel({ selectedElement }: DetailPanelProps) {
               <Box>
                 <Text {...S.label}>Node Class</Text>
                 <Text {...S.value}>
-                  {node.node_type.node_type}
+                  {node.node_class.node_class}
                 </Text>
               </Box>
               {node.data_type && (
@@ -271,9 +272,9 @@ export function DetailPanel({ selectedElement }: DetailPanelProps) {
                 {child.display_name ?? child.expanded_node_id ?? String(child.id)}
               </Text>
 
-              {child.node_type?.node_type && (
+              {child.node_class?.node_class && (
                 <Badge colorScheme="gray" flexShrink={0}>
-                  {child.node_type.node_type}
+                  {child.node_class.node_class}
                 </Badge>
               )}
 

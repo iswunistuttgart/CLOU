@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.*/
 
 
-export interface OPCUANodeType {
+export interface OPCUANodeClass {
   id: number;
-  node_type: string;
+  node_class: string;
 }
 
 export interface OPCUASpec {
@@ -66,7 +66,7 @@ export interface OPCUANodeset {
 }
 
 export interface OPCUANode extends OPCUABaseNode {
-  node_type_id: number;
+  node_class_id: number;
   typedefinition_id: number;
   parent_id: number;
   example_id: number;
@@ -75,10 +75,10 @@ export interface OPCUANode extends OPCUABaseNode {
   modelling_rule_id: number;
   nodeset: OPCUANodeset;
   naming_example: string;
-  node_type: OPCUANodeType;
+  node_class: OPCUANodeClass;
   parent: OPCUANode | null;
   typedefinition: OPCUANode | null;
-  data_type: OPCUABaseNode | null;
+  data_type: OPCUANode | null;
   unit: OPCUAUnit | null;
   modelling_rule: OPCUAModellingRule | null;
   children: OPCUANode[];
@@ -98,7 +98,7 @@ export interface OPCUASearchWindowProps {
    * Function to call when search is executed.
    * Should return a Promise with array of OPCUAElement results
    */
-  onSearch: (query: string, nodesetIds: number[], nodeTypes: string[]) => Promise<OPCUAElement[]>
+  onSearch: (query: string, nodesetIds: number[], nodeClasses: string[]) => Promise<OPCUAElement[]>
 
   /** List of available companion specifications for filtering */
   companionSpecs?: string[]
@@ -107,7 +107,7 @@ export interface OPCUASearchWindowProps {
   defaultSelectedSpecs?: string[]
 
   /** Node types selected by default */
-  defaultNodeTypes?: string[]
+  defaultNodeClasses?: string[]
 
   /** Custom height for the component (default: 100%) */
   height?: string

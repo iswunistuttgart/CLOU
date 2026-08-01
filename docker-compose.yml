@@ -3,7 +3,7 @@ name: clou
 services:
 
   db:
-    image: paradedb/paradedb:0.18.15
+    image: paradedb/paradedb:0.24.3
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-app}"]

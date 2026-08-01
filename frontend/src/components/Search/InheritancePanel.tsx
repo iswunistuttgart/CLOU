@@ -167,9 +167,9 @@ export function InheritancePanel({ selectedElement, onSelectNodeById }: Inherita
   const children = Array.isArray(node?.children) ? node.children : []
   const instances = Array.isArray(node?.typedefinition_of) ? node.typedefinition_of : []
 
-  const subtypeNodeTypes = ['ObjectType', 'VariableType']
-  const subtypes = children.filter(c => c.node_type?.node_type && subtypeNodeTypes.includes(c.node_type.node_type))
-  const instanceDeclarations = children.filter(c => !c.node_type?.node_type || !subtypeNodeTypes.includes(c.node_type.node_type))
+  const subtypeNodeClasses = ['ObjectType', 'VariableType']
+  const subtypes = children.filter(c => c.node_class?.node_class && subtypeNodeClasses.includes(c.node_class.node_class))
+  const instanceDeclarations = children.filter(c => !c.node_class?.node_class || !subtypeNodeClasses.includes(c.node_class.node_class))
   const hasChildrenContent = subtypes.length > 0 || instanceDeclarations.length > 0 || instances.length > 0
 
   const visibleSubtypes = showAllSubtypes ? subtypes : subtypes.slice(0, 12)
@@ -206,11 +206,11 @@ export function InheritancePanel({ selectedElement, onSelectNodeById }: Inherita
     if (!fullNode) return
 
     const children = fullNode.children || []
-    const subtypeNodeTypes = ['ObjectType', 'VariableType']
+    const subtypeNodeClasses = ['ObjectType', 'VariableType']
     const subtypeChildren = children.filter(c => 
       c.id !== undefined && 
-      c.node_type?.node_type && 
-      subtypeNodeTypes.includes(c.node_type.node_type)
+      c.node_class?.node_class && 
+      subtypeNodeClasses.includes(c.node_class.node_class)
     )
 
     if (depth < maxDepth) {
@@ -252,11 +252,11 @@ export function InheritancePanel({ selectedElement, onSelectNodeById }: Inherita
   function ChildrenListWithData({ nodes, depth = 0 }: { nodes: Partial<OPCUANode>[]; depth?: number }) {
     if (nodes.length === 0 || depth > 2) return null
 
-    const subtypeNodeTypes = ['ObjectType', 'VariableType']
+    const subtypeNodeClasses = ['ObjectType', 'VariableType']
     const filteredNodes = nodes.filter(c => 
       c.id !== undefined && 
-      c.node_type?.node_type && 
-      subtypeNodeTypes.includes(c.node_type.node_type)
+      c.node_class?.node_class && 
+      subtypeNodeClasses.includes(c.node_class.node_class)
     )
 
     return (

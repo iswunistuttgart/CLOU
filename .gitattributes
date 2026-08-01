@@ -1,4 +1,2 @@
-backend/data/db-backup.sql filter=lfs diff=lfs merge=lfs -text
-* text=auto eol=lf
-*.sh text eol=lf
 
+backend/data/db-backup.zip filter=lfs diff=lfs merge=lfs -text

@@ -47,7 +47,7 @@ export function ResultsList({ results, selectedElement, onSelectElement }: Resul
   <Flex gap={3} flexDirection="column">
     {isSelectedOutsideResults && selectedElement && (() => {
       const node = selectedElement.node
-      const Icon = getNodeIcon(node.node_type.node_type)
+      const Icon = getNodeIcon(node.node_class.node_class)
 
       return (
         <Card.Root
@@ -65,7 +65,7 @@ export function ResultsList({ results, selectedElement, onSelectElement }: Resul
                 <Flex justify="space-between" align="center" gap={2} mb={2}>
                   <Badge {...S.resultCardPinnedLabel}>Current node</Badge>
                   <Badge {...S.resultCardTypeBadge}>
-                    {node.node_type.node_type}
+                    {node.node_class.node_class}
                   </Badge>
                 </Flex>
 
@@ -102,7 +102,7 @@ export function ResultsList({ results, selectedElement, onSelectElement }: Resul
     {results.map((element) => {
       const node = element.node
       const isSelected = selectedElement?.node.id === node.id
-      const Icon = getNodeIcon(node.node_type.node_type)
+      const Icon = getNodeIcon(node.node_class.node_class)
 
       return (
         <Card.Root
@@ -122,7 +122,7 @@ export function ResultsList({ results, selectedElement, onSelectElement }: Resul
                     {node.display_name}
                   </Heading>
                   <Badge {...S.resultCardTypeBadge}>
-                    {node.node_type.node_type}
+                    {node.node_class.node_class}
                   </Badge>
                 </Flex>
 

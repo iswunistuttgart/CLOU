@@ -17,22 +17,6 @@ npm run dev
 
 Open http://localhost:5173
 
-## Generate API Client
-
-After backend API changes, regenerate the TypeScript client:
-
-```bash
-# Option 1: Automatic (requires backend running)
-cd ..
-source backend/.venv/bin/activate
-./scripts/generate-client.sh
-
-# Option 2: Manual
-# Start Docker stack, then:
-# 1. Download http://localhost/api/v1/openapi.json -> frontend/openapi.json
-# 2. npm run generate-client
-```
-
 ## Code Structure
 
 | Directory | Purpose |
