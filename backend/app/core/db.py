@@ -215,10 +215,15 @@ def load_sql_backup(
         FileNotFoundError: If psql or docker/podman is missing.
         RuntimeError: If psql returns a non-zero exit code.
     """
-    if not os.path.isfile(sql_file_path):
+
+    zip_file_path = sql_file_path
+    sql_file_name_in_zip = "db-backup.sql"
+
+
+    if not os.path.isfile(zip_file_path):
         logger.info(
-            "SQL backup restore skipped because backup file is missing at %s.",
-            sql_file_path,
+            "SQL backup restore skipped because backup ZIP file is missing at %s.",
+            zip_file_path,
         )
         return "missing"
 
@@ -235,7 +240,7 @@ def load_sql_backup(
             ", ".join(incomplete_tables),
         )
 
-    logger.info(f"Attempting to load SQL backup from {sql_file_path}...")
+    logger.info(f"Attempting to load SQL backup %s from ZIP file %s...", sql_file_name_in_zip, zip_file_path)
 
     _truncate_seed_tables(logger=logger)
 
@@ -244,29 +249,42 @@ def load_sql_backup(
     env["PGPASSWORD"] = settings.POSTGRES_PASSWORD
 
     try:
+        with zipfile.ZipFile(zip_file_path, "r") as backup_zip:
+            if sql_file_name_in_zip not in backup_zip.namelist():
+                raise FileNotFoundError(
+                    f"{sql_file_name_in_zip} was not found inside {zip_file_path}."
+                )
+
+            with backup_zip.open(sql_file_name_in_zip, "r") as sql_file:
+                sql_script = sql_file.read().decode("utf-8")
+
         psql_binary = shutil.which("psql")
+
         if psql_binary:
             logger.info("Using local psql executable for SQL backup restore.")
+
             psql_command = [
                 psql_binary,
                 "-h", settings.POSTGRES_SERVER,
                 "-U", settings.POSTGRES_USER,
                 "-d", settings.POSTGRES_DB,
-                "-f", sql_file_path,
                 "-v", "ON_ERROR_STOP=1",
                 "--single-transaction",
                 "--quiet",
             ]
+
             if settings.POSTGRES_PORT:
                 psql_command.extend(["-p", str(settings.POSTGRES_PORT)])
 
             result = subprocess.run(
                 psql_command,
+                input=sql_script,
                 env=env,
                 check=True,
                 capture_output=True,
                 text=True,
             )
+
         else:
             compose_binary = shutil.which("docker") or shutil.which("podman")
             if not compose_binary:
@@ -278,6 +296,7 @@ def load_sql_backup(
                 "Local psql not found. Using %s compose exec db psql for SQL backup restore.",
                 Path(compose_binary).name,
             )
+
             compose_command = [
                 compose_binary,
                 "compose",
@@ -292,38 +311,48 @@ def load_sql_backup(
                 "--single-transaction",
                 "--quiet",
             ]
-            with open(sql_file_path, "r", encoding="utf-8") as backup_file:
-                result = subprocess.run(
-                    compose_command,
-                    cwd=str(PROJECT_ROOT),
-                    env=env,
-                    stdin=backup_file,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
+
+            result = subprocess.run(
+                compose_command,
+                cwd=str(PROJECT_ROOT),
+                env=env,
+                input=sql_script,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
         logger.info("SQL backup loaded successfully using psql.")
 
         if result.stdout:
-            logger.debug(f"psql stdout:\n{result.stdout}")
-        if result.stderr:  # psql might output notices to stderr even on success
-            logger.info(f"psql stderr:\n{result.stderr}")
+            logger.debug("psql stdout:\n%s", result.stdout)
+
+        if result.stderr:
+            logger.info("psql stderr:\n%s", result.stderr)
 
         return "restored"
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error loading SQL backup using psql. Return code: {e.returncode}")
+        logger.error("Error loading SQL backup using psql. Return code: %s", e.returncode)
+
         if e.stdout:
-            logger.error(f"psql stdout:\n{e.stdout}")
+            logger.error("psql stdout:\n%s", e.stdout)
+
         if e.stderr:
-            logger.error(f"psql stderr:\n{e.stderr}")
+            logger.error("psql stderr:\n%s", e.stderr)
+
         raise RuntimeError("SQL backup restore failed") from e
+
     except FileNotFoundError:
-        logger.error("Required SQL backup file or psql executable was not found.")
+        logger.error("Required SQL backup ZIP file, SQL file inside ZIP, or psql executable was not found.")
         raise
+
+    except zipfile.BadZipFile as e:
+        logger.error("SQL backup ZIP file is invalid or corrupted: %s", zip_file_path)
+        raise RuntimeError("SQL backup ZIP file is invalid or corrupted") from e
+
     except Exception as e:
-        logger.error(f"An unexpected error occurred during SQL backup: {e}")
+        logger.error("An unexpected error occurred during SQL backup: %s", e)
         raise
 
 

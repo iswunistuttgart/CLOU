@@ -79,7 +79,7 @@ def _truncate_for_log(value, max_len: int = 200):
 
 
 def get_sql_backup_path() -> str:
-    local_backup_path = Path("data/db-backup.sql")
+    local_backup_path = Path("data/db-backup.zip")
     if local_backup_path.is_file():
         return str(local_backup_path)
     return "/backups/db-backup.sql"
