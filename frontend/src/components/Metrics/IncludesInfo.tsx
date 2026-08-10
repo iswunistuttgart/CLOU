@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.*/
 
 
-import { Card, Flex, Heading, SimpleGrid, Text, Stat } from "@chakra-ui/react";
+import { Card, Flex, Heading, SimpleGrid, Text, Stat, Box } from "@chakra-ui/react";
 import { useCsvData } from "./NodeCountChart";
 import { IncludedNode, IncludesCsvRow, IncludesData } from "./types";
 
@@ -23,9 +23,15 @@ function useInclChartData(csv: string) {
         select: (rows: IncludesCsvRow[]): IncludesData => {
   const nodes = new Map<string, IncludedNode>();
   const foreignNamespaces = new Set<string>();
+  const includesPerNamespace = new Map<string, number>();
 
   rows.forEach((row) => {
     foreignNamespaces.add(row.foreign_namespace);
+
+    includesPerNamespace.set(
+        row.foreign_namespace,
+        (includesPerNamespace.get(row.foreign_namespace) ?? 0) + 1
+    );
 
     let node = nodes.get(row.nodeid);
 
@@ -49,6 +55,12 @@ function useInclChartData(csv: string) {
     totalNodes: nodes.size,
     totalForeignNamespaces: foreignNamespaces.size,
     totalIncludes: rows.length,
+    includesPerNamespace: Array.from(includesPerNamespace.entries())
+        .map(([namespace, count]) => ({
+            namespace,
+            count,
+        }))
+        .sort((a,b) => a.namespace.localeCompare(b.namespace)),
     nodes: Array.from(nodes.values()),
   };
 }
@@ -67,24 +79,45 @@ export function IncludesInfo({ csv }: Props) {
   if (error) return <div>Error preparing Aggreation Chart Data...</div>;
   if (!data) return <div>No Data</div>;
 return(
-    <Flex>
-    <SimpleGrid columns={3} gap={4} mb={6}>
-  <Stat.Root>
-    <Stat.Label>Affected Nodes</Stat.Label>
-    <Stat.ValueText>{data.totalNodes}</Stat.ValueText>
-  </Stat.Root>
+  <Flex direction={{ base: "column", lg: "row" }} gap={6}>
+    <Box flex="0 0 40%" gap={6}>
+      <SimpleGrid columns={3} gap={4} mb={6}>
+        <Stat.Root>
+          <Stat.Label>Affected Nodes</Stat.Label>
+          <Stat.ValueText>{data.totalNodes}</Stat.ValueText>
+        </Stat.Root>
 
-  <Stat.Root>
-    <Stat.Label>Foreign Namespaces</Stat.Label>
-    <Stat.ValueText>{data.totalForeignNamespaces}</Stat.ValueText>
-  </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Foreign Namespaces</Stat.Label>
+          <Stat.ValueText>{data.totalForeignNamespaces}</Stat.ValueText>
+        </Stat.Root>
 
-  <Stat.Root>
-    <Stat.Label>Includes</Stat.Label>
-    <Stat.ValueText>{data.totalIncludes}</Stat.ValueText>
-  </Stat.Root>
-</SimpleGrid>
-<Flex direction="column" gap={4}>
+        <Stat.Root>
+          <Stat.Label>Includes</Stat.Label>
+          <Stat.ValueText>{data.totalIncludes}</Stat.ValueText>
+        </Stat.Root>
+      </SimpleGrid>
+
+      <Flex direction="column" gap={6} mb={6}>
+        {data.includesPerNamespace.map((entry) => (
+          //      <GridItem key={entry.namespace} colSpan={3}>
+          <Flex
+            justify="space-between"
+            align="center"
+            borderTop="1px solid"
+            borderColor="gray.200"
+            px={2}
+            py={2}
+          >
+            <Text fontWeight="medium">{entry.namespace}</Text>
+            <Text fontWeight="semibold">{entry.count} Includes</Text>
+          </Flex>
+          //     </GridItem>
+        ))}
+      </Flex>
+    </Box>
+
+<Flex direction="column" gap={4} flex='1'>
   {data.nodes.map(node => (
     <Card.Root key={node.nodeId}>
       <Card.Header>
