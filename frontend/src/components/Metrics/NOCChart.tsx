@@ -36,7 +36,6 @@ export function useNOCChartData(
 
     select: (data: NOCCsvRow[]): NOCChartData[] => {
       return data
-        .slice(0, -1)
         .map((row) => ({
           name: row.browsename,
           noc: Number(row.noc),

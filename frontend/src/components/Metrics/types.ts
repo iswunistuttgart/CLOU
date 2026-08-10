@@ -124,10 +124,16 @@ export type IncludedNode = {
   }[];
 };
 
+export type IncludesPerNamespace = {
+    namespace: string;
+    count: number;
+};
+
 export type IncludesData = {
   totalNodes: number;
   totalForeignNamespaces: number;
   totalIncludes: number;
+  includesPerNamespace: IncludesPerNamespace[];
   nodes: IncludedNode[];
 };
 
