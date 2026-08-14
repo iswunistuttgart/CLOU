@@ -4,6 +4,8 @@ CLOU is a platform for analyzing and improving OPC UA model quality through sema
 
 ## Getting Started
 
+See the [wiki](https://github.com/iswunistuttgart/CLOU/wiki/CLOU-%E2%80%90-Wiki) for usage instructions.
+
 ### Prerequisites
 
 - [Docker](https://www.docker.com/)
