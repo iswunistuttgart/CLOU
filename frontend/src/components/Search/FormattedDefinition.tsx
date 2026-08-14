@@ -1,16 +1,18 @@
-/*Copyright 2026 Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. and Universität Stuttgart
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.*/
+/* Copyright 2026 Fraunhofer-Gesellschaft zur Förderung der
+ * angewandten Forschung e.V. and Universität Stuttgart
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 import { Box, Heading, Text, chakra } from '@chakra-ui/react'
 import { styles as S } from './styles'
@@ -29,48 +31,181 @@ interface FormattedDefinitionProps {
   text?: string | null
 }
 
+/**
+ * Fügt physische Textzeilen zusammen, wenn sich ein CSV-Feld
+ * über mehrere Zeilen erstreckt.
+ *
+ * Beispiel:
+ *
+ * "PumpKickTimeDifference
+ * 0:EngineeringUnits",NamespaceUri: ...
+ */
+function splitLogicalLines(text: string): string[] {
+  const physicalLines = text.split(/\r?\n/)
+  const logicalLines: string[] = []
+
+  let currentLine = ''
+  let insideQuotes = false
+
+  for (const physicalLine of physicalLines) {
+    currentLine = currentLine
+      ? `${currentLine}\n${physicalLine}`
+      : physicalLine
+
+    for (let index = 0; index < physicalLine.length; index += 1) {
+      if (physicalLine[index] !== '"') {
+        continue
+      }
+
+      /*
+       * Zwei Anführungszeichen innerhalb eines CSV-Feldes
+       * repräsentieren ein einzelnes Anführungszeichen.
+       */
+      if (insideQuotes && physicalLine[index + 1] === '"') {
+        index += 1
+        continue
+      }
+
+      insideQuotes = !insideQuotes
+    }
+
+    if (!insideQuotes) {
+      logicalLines.push(currentLine)
+      currentLine = ''
+    }
+  }
+
+  /*
+   * Auch eine fehlerhafte letzte Zeile mit nicht geschlossenem
+   * Anführungszeichen soll nicht verloren gehen.
+   */
+  if (currentLine) {
+    logicalLines.push(currentLine)
+  }
+
+  return logicalLines
+}
+
+/**
+ * Zerlegt eine CSV-Zeile, ohne Kommas innerhalb von
+ * Anführungszeichen als Trennzeichen zu behandeln.
+ */
 function splitCsvLine(line: string): string[] | null {
   const trimmed = line.trim()
 
-  if (!trimmed.includes(',')) return null
+  if (!trimmed || !trimmed.includes(',') || /^,+$/.test(trimmed)) {
+    return null
+  }
 
-  if (/^,+$/.test(trimmed)) return null
+  const columns: string[] = []
 
-  const cols = trimmed.split(',').map(col => col.trim())
-  const nonEmptyCols = cols.filter(Boolean)
+  let currentColumn = ''
+  let insideQuotes = false
+  let containsDelimiter = false
 
-  if (nonEmptyCols.length < 2) return null
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const character = trimmed[index]
 
-  return cols
+    if (character === '"') {
+      if (insideQuotes && trimmed[index + 1] === '"') {
+        currentColumn += '"'
+        index += 1
+      } else {
+        insideQuotes = !insideQuotes
+      }
+
+      continue
+    }
+
+    if (character === ',' && !insideQuotes) {
+      columns.push(currentColumn.trim())
+      currentColumn = ''
+      containsDelimiter = true
+      continue
+    }
+
+    currentColumn += character
+  }
+
+  if (!containsDelimiter) {
+    return null
+  }
+
+  columns.push(currentColumn.trim())
+
+  const nonEmptyColumns = columns.filter(
+    column => column.trim().length > 0,
+  )
+
+  if (nonEmptyColumns.length < 2) {
+    return null
+  }
+
+  return columns
 }
 
-function isKnownTableHeader(cols: string[]): boolean {
-  const first = cols[0]?.trim().toLowerCase()
+/**
+ * Erkennt Tabellenköpfe, damit mehrere Tabellenbereiche nach einer
+ * gemeinsamen Beschriftung getrennt dargestellt werden können.
+ *
+ * Das ist insbesondere für Tabelle 67 notwendig:
+ *
+ * 1. Attribute / Value
+ * 2. References / Node Class / BrowseName / ...
+ */
+function isKnownTableHeader(columns: string[]): boolean {
+  const normalizedColumns = columns.map(column =>
+    column.trim().toLowerCase().replace(/\s+/g, ' '),
+  )
+
+  const firstColumn = normalizedColumns[0]
 
   return (
-    first === 'attribute' ||
-    first === 'references' ||
-    first === 'source path' ||
-    first === 'sourcebrowsepath' ||
-    first === 'source browse path'
+    firstColumn === 'attribute' ||
+    firstColumn === 'references' ||
+    firstColumn === 'browsepath' ||
+    firstColumn === 'browse path' ||
+    firstColumn === 'source path' ||
+    firstColumn === 'sourcebrowsepath' ||
+    firstColumn === 'source browse path' ||
+    (normalizedColumns.includes('value attribute') &&
+      normalizedColumns.includes('description'))
   )
 }
 
+/**
+ * Entfernt umschließende Anführungszeichen und wandelt doppelte
+ * CSV-Anführungszeichen in normale Anführungszeichen um.
+ */
+function cleanQuotedText(value: string): string {
+  let cleaned = value.trim()
+
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    cleaned = cleaned.slice(1, -1)
+  }
+
+  return cleaned.replace(/""/g, '"').trim()
+}
+
 function parseDefinition(text?: string | null): DefinitionBlock[] {
-  if (!text?.trim()) return []
+  if (!text?.trim()) {
+    return []
+  }
 
-  const lines = text.split(/\r?\n/)
-
+  const lines = splitLogicalLines(text)
   const blocks: DefinitionBlock[] = []
 
   let paragraphLines: string[] = []
   let tableRows: string[][] = []
   let listItems: string[] = []
+
   let inConformanceUnits = false
   let expectTableHeader = false
 
   const flushParagraph = () => {
-    if (paragraphLines.length === 0) return
+    if (paragraphLines.length === 0) {
+      return
+    }
 
     const paragraph = paragraphLines
       .join(' ')
@@ -88,7 +223,9 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
   }
 
   const flushTable = () => {
-    if (tableRows.length === 0) return
+    if (tableRows.length === 0) {
+      return
+    }
 
     blocks.push({
       type: 'table',
@@ -99,7 +236,9 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
   }
 
   const flushList = () => {
-    if (listItems.length === 0) return
+    if (listItems.length === 0) {
+      return
+    }
 
     blocks.push({
       type: 'list',
@@ -121,15 +260,24 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
     if (!line) {
       flushAll()
       inConformanceUnits = false
+      expectTableHeader = false
       continue
     }
 
+    /*
+     * Zeilen, die ausschließlich aus Kommas bestehen, ignorieren.
+     */
     if (/^,+$/.test(line)) {
       continue
     }
 
+    /*
+     * Überschriften wie:
+     * 7.30 PumpKickObjectType ObjectType Definition
+     */
     if (/^\d+(\.\d+)*\s+.+/.test(line)) {
       flushAll()
+
       inConformanceUnits = false
       expectTableHeader = false
 
@@ -141,16 +289,26 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
       continue
     }
 
-    // Figure-Zeilen ignorieren (Bilder sind im Markdown nicht vorhanden)
+    /*
+     * Figure-Zeilen ignorieren, da die zugehörigen Bilder
+     * nicht Teil des übergebenen Textes sind.
+     */
     if (/^(\[Figure:|Figure\s+\d+\s*-)/i.test(line)) {
       flushAll()
+
       inConformanceUnits = false
       expectTableHeader = false
+
       continue
     }
 
+    /*
+     * Tabellenbeschriftungen wie:
+     * Table 67 - PumpKickObjectType Definition
+     */
     if (/^Table\s+\d+\s*-/i.test(line)) {
       flushAll()
+
       inConformanceUnits = false
       expectTableHeader = true
 
@@ -164,6 +322,7 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
 
     if (/^Conformance Units$/i.test(line)) {
       flushAll()
+
       inConformanceUnits = true
       expectTableHeader = false
 
@@ -183,31 +342,42 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
       continue
     }
 
-    // WICHTIG: "Subtype of ..."-Check VOR dem CSV-Check,
-    // damit diese Zeilen (mit Kommas, ggf. in Anführungszeichen) nicht zerteilt werden.
-    if (/^"?\s*Subtype of\b/i.test(line)) {
-      // Umschließende Anführungszeichen entfernen
-      const cleaned = line.replace(/^"(.*)"$/, '$1').trim()
+    /*
+     * "Subtype of ..." muss vor dem normalen CSV-Parsing behandelt
+     * werden. Die enthaltenen Kommas gehören zum Text und nicht zu
+     * weiteren Tabellenzellen.
+     */
+    if (/^"+\s*Subtype of\b/i.test(line) || /^Subtype of\b/i.test(line)) {
+      const cleaned = cleanQuotedText(line)
+
+      flushParagraph()
+      flushList()
 
       if (tableRows.length > 0) {
-        // Gehört als spannende Zeile zur laufenden Tabelle
+        /*
+         * Eine Zeile mit nur einer Zelle wird beim Rendern automatisch
+         * über alle Spalten der Tabelle gespannt.
+         */
         tableRows.push([cleaned])
       } else {
-        // Keine Tabelle vorhanden -> als Absatz rendern
-        flushList()
         expectTableHeader = false
         paragraphLines.push(cleaned)
       }
+
       continue
     }
 
-    const csvCols = splitCsvLine(line)
+    const csvColumns = splitCsvLine(line)
 
-    if (csvCols) {
-      const startsNewKnownTable =
-        isKnownTableHeader(csvCols) || expectTableHeader
+    if (csvColumns) {
+      const knownHeader = isKnownTableHeader(csvColumns)
+      const startsNewTable = knownHeader || expectTableHeader
 
-      if (tableRows.length === 0 && !startsNewKnownTable) {
+      /*
+       * CSV-artige Zeilen außerhalb einer erwarteten oder bereits
+       * laufenden Tabelle werden weiterhin als Text behandelt.
+       */
+      if (tableRows.length === 0 && !startsNewTable) {
         paragraphLines.push(line)
         continue
       }
@@ -215,31 +385,45 @@ function parseDefinition(text?: string | null): DefinitionBlock[] {
       flushParagraph()
       flushList()
 
-      const isNewHeader = isKnownTableHeader(csvCols) || expectTableHeader
-
-      if (tableRows.length > 0 && isNewHeader) {
+      /*
+       * Beginnt innerhalb einer laufenden Tabelle ein neuer bekannter
+       * Tabellenkopf, wird ein neuer Tabellenbereich erzeugt.
+       *
+       * Beispiel Tabelle 67:
+       * - Attribute, Value
+       * - References, Node Class, BrowseName, ...
+       */
+      if (tableRows.length > 0 && knownHeader) {
         flushTable()
       }
 
+      /*
+       * Bei einer unerwarteten Änderung der Spaltenanzahl wird ebenfalls
+       * eine neue Tabelle begonnen. Bekannte spannende Zeilen wie
+       * "Subtype of ..." wurden bereits weiter oben behandelt.
+       */
       if (
         tableRows.length > 0 &&
-        !isNewHeader &&
-        csvCols.length !== tableRows[0].length
+        !knownHeader &&
+        csvColumns.length !== tableRows[0].length
       ) {
         flushTable()
       }
 
-      tableRows.push(csvCols)
-
+      tableRows.push(csvColumns)
       expectTableHeader = false
+
       continue
     }
 
+    /*
+     * Normale Textzeile beendet eine laufende Tabelle oder Liste.
+     */
     flushTable()
     flushList()
-    expectTableHeader = false
 
-    paragraphLines.push(line)
+    expectTableHeader = false
+    paragraphLines.push(cleanQuotedText(line))
   }
 
   flushAll()
@@ -251,8 +435,12 @@ function InlineText({ text }: { text: string }) {
   return <>{text}</>
 }
 
-export function FormattedDefinition({ text }: FormattedDefinitionProps) {
-  if (!text?.trim()) return null
+export function FormattedDefinition({
+  text,
+}: FormattedDefinitionProps) {
+  if (!text?.trim()) {
+    return null
+  }
 
   const blocks = parseDefinition(text)
 
@@ -316,7 +504,12 @@ export function FormattedDefinition({ text }: FormattedDefinitionProps) {
 
         if (block.type === 'paragraph') {
           return (
-            <Text key={index} {...S.descText} mb={3} lineHeight="1.7">
+            <Text
+              key={index}
+              {...S.descText}
+              mb={3}
+              lineHeight="1.7"
+            >
               <InlineText text={block.text} />
             </Text>
           )
@@ -353,10 +546,12 @@ export function FormattedDefinition({ text }: FormattedDefinitionProps) {
               borderWidth="1px"
               borderColor="gray.200"
               borderRadius="md"
+              bg="white"
             >
               <Box
                 as="table"
                 width="100%"
+                minWidth={columnCount >= 5 ? '800px' : undefined}
                 borderCollapse="collapse"
                 fontSize="sm"
               >
@@ -371,7 +566,9 @@ export function FormattedDefinition({ text }: FormattedDefinitionProps) {
                         py={2}
                         borderBottomWidth="1px"
                         borderRightWidth={
-                          cellIndex < header.length - 1 ? '1px' : '0'
+                          cellIndex < header.length - 1
+                            ? '1px'
+                            : '0'
                         }
                         borderColor="gray.200"
                         bg="gray.50"
@@ -388,7 +585,11 @@ export function FormattedDefinition({ text }: FormattedDefinitionProps) {
 
                 <Box as="tbody">
                   {rows.map((row, rowIndex) => {
-                    const isSpanningRow = row.length === 1 && columnCount > 1
+                    const isSpanningRow =
+                      row.length === 1 && columnCount > 1
+
+                    const showBottomBorder =
+                      rowIndex < rows.length - 1
 
                     return (
                       <Box key={rowIndex} as="tr">
@@ -398,13 +599,15 @@ export function FormattedDefinition({ text }: FormattedDefinitionProps) {
                             px={3}
                             py={2}
                             borderBottomWidth={
-                              rowIndex < rows.length - 1 ? '1px' : '0'
+                              showBottomBorder ? '1px' : '0'
                             }
                             borderColor="gray.200"
                             color="gray.700"
                             fontStyle="italic"
                             bg="white"
                             verticalAlign="top"
+                            whiteSpace="pre-line"
+                            overflowWrap="anywhere"
                           >
                             {row[0]}
                           </Td>
@@ -416,15 +619,19 @@ export function FormattedDefinition({ text }: FormattedDefinitionProps) {
                               px={3}
                               py={2}
                               borderBottomWidth={
-                                rowIndex < rows.length - 1 ? '1px' : '0'
+                                showBottomBorder ? '1px' : '0'
                               }
                               borderRightWidth={
-                                cellIndex < header.length - 1 ? '1px' : '0'
+                                cellIndex < header.length - 1
+                                  ? '1px'
+                                  : '0'
                               }
                               borderColor="gray.200"
                               color="gray.700"
                               verticalAlign="top"
                               bg="white"
+                              whiteSpace="pre-line"
+                              overflowWrap="anywhere"
                             >
                               {row[cellIndex] ?? ''}
                             </Box>
