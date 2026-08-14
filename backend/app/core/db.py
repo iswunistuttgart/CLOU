@@ -32,7 +32,8 @@ engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = PROJECT_ROOT / "alembic.ini"
-DATABASE_INIT_LOCK_ID = 20260706
+DATABASE_INIT_LOCK_ID = 1000
+NODE_SEARCH_ARTIFACTS_LOCK_ID = 2000
 
 REQUIRED_SEEDED_TABLES = (
     "nodeset",
@@ -357,7 +358,7 @@ def ensure_node_search_db_artifacts(logger=logging.getLogger("app.db")) -> None:
         logger.info("Waiting for node-search artifacts lock...")
         conn.execute(
             text("SELECT pg_advisory_lock(:lock_id)"),
-            {"lock_id": DATABASE_INIT_LOCK_ID},
+            {"lock_id": NODE_SEARCH_ARTIFACTS_LOCK_ID},
         )
         try:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
@@ -437,6 +438,6 @@ def ensure_node_search_db_artifacts(logger=logging.getLogger("app.db")) -> None:
         finally:
             conn.execute(
                 text("SELECT pg_advisory_unlock(:lock_id)"),
-                {"lock_id": DATABASE_INIT_LOCK_ID},
+                {"lock_id": NODE_SEARCH_ARTIFACTS_LOCK_ID},
             )
             conn.commit()
