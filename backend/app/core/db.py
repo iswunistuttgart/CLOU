@@ -63,8 +63,8 @@ def _get_incomplete_seed_tables() -> list[str]:
 
     return incomplete_tables
 
-def _truncate_seed_tables(logger: logging.Logger) -> None:
-    existing_tables = []
+def _get_existing_seed_tables() -> list[str]:
+    existing_tables: list[str] = []
     with engine.connect() as conn:
         for table_name in REQUIRED_SEEDED_TABLES:
             exists = conn.execute(
@@ -72,17 +72,7 @@ def _truncate_seed_tables(logger: logging.Logger) -> None:
             ).scalar()
             if exists:
                 existing_tables.append(table_name)
-
-        if existing_tables:
-            conn.execute(
-                text(
-                    "TRUNCATE TABLE "
-                    + ", ".join(f"public.{t}" for t in existing_tables)
-                    + " RESTART IDENTITY CASCADE;"
-                )
-            )
-            conn.commit()
-    logger.info("Seed-Tabellen vor Restore geleert: %s", ", ".join(existing_tables))
+    return existing_tables
 
 
 def _database_already_seeded() -> bool:
@@ -137,22 +127,25 @@ def initialize_database(
     sql_file_path: str, logger=logging.getLogger("app.db")
 ) -> str:
     with engine.connect() as conn:
-        logger.info("Waiting for database initialization lock...")
-        conn.execute(
-            text("SELECT pg_advisory_lock(:lock_id)"),
+        got_lock = conn.execute(
+            text("SELECT pg_try_advisory_lock(:lock_id)"),
             {"lock_id": DATABASE_INIT_LOCK_ID},
-        )
+        ).scalar()
+
+        if not got_lock:
+            logger.info(
+                "Another process holds the DB init lock; skipping initialization."
+            )
+            return "already_seeded"
 
         try:
             restore_status = load_sql_backup(sql_file_path=sql_file_path, logger=logger)
             if restore_status == "restored":
                 _stamp_alembic_version_table(logger=logger)
                 return "restored"
-
             if restore_status == "missing":
                 create_initial_values()
                 return "seeded"
-
             return "already_seeded"
         finally:
             conn.execute(
@@ -160,12 +153,6 @@ def initialize_database(
                 {"lock_id": DATABASE_INIT_LOCK_ID},
             )
             conn.commit()
-
-
-# make sure all SQLModel models are imported (app.models) before initializing DB
-# otherwise, SQLModel might fail to initialize relationships properly
-# for more details: https://github.com/fastapi/full-stack-fastapi-template/issues/28
-
 
 def create_initial_values() -> None:
     with Session(engine) as session:
@@ -243,22 +230,29 @@ def load_sql_backup(
 
     logger.info(f"Attempting to load SQL backup %s from ZIP file %s...", sql_file_name_in_zip, zip_file_path)
 
-    _truncate_seed_tables(logger=logger)
+    with zipfile.ZipFile(zip_file_path, "r") as backup_zip:
+        if sql_file_name_in_zip not in backup_zip.namelist():
+            raise FileNotFoundError(
+                f"{sql_file_name_in_zip} was not found inside {zip_file_path}."
+            )
+        with backup_zip.open(sql_file_name_in_zip, "r") as sql_file:
+            sql_script = sql_file.read().decode("utf-8")
+
+    existing_tables = _get_existing_seed_tables()
+    if existing_tables:
+        truncate_stmt = (
+            "TRUNCATE TABLE "
+            + ", ".join(f"public.{t}" for t in existing_tables)
+            + " RESTART IDENTITY CASCADE;\n"
+        )
+        sql_script = truncate_stmt + sql_script
+
 
     # Prepare environment variables for psql, especially PGPASSWORD
     env = os.environ.copy()
     env["PGPASSWORD"] = settings.POSTGRES_PASSWORD
 
     try:
-        with zipfile.ZipFile(zip_file_path, "r") as backup_zip:
-            if sql_file_name_in_zip not in backup_zip.namelist():
-                raise FileNotFoundError(
-                    f"{sql_file_name_in_zip} was not found inside {zip_file_path}."
-                )
-
-            with backup_zip.open(sql_file_name_in_zip, "r") as sql_file:
-                sql_script = sql_file.read().decode("utf-8")
-
         psql_binary = shutil.which("psql")
 
         if psql_binary:

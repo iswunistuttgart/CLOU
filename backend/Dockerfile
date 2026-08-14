@@ -100,4 +100,4 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 RUN uv sync --frozen --package app && rm -rf /root/.cache/uv
 
 # Backend can now use multiple workers - embedding model is in separate service
-CMD ["fastapi", "run", "--workers", "4", "app/main.py", "--host", "0.0.0.0"]
+CMD ["fastapi", "run", "--workers", "1", "app/main.py", "--host", "0.0.0.0"]

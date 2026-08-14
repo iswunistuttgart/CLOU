@@ -88,7 +88,7 @@ services:
       prestart:
         condition: service_completed_successfully
     volumes:
-      - ./backend/data/db-backup.sql:/backups/db-backup.sql
+      - ./backend/data/db-backup.zip:/app/data/db-backup.zip:ro
     environment:
       - PROJECT_NAME=${PROJECT_NAME:-CLOU}
       - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
@@ -111,7 +111,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 300s
 
   frontend:
     image: ghcr.io/iswunistuttgart/clou/frontend:latest
