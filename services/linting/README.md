@@ -16,6 +16,12 @@ Validates OPC UA information models against quality rules during import.
 
 ### Building
 
+UA-Modelcompiler is a prerequisite (cloning is only required once)
+
+```bash
+git clone https://github.com/OPCFoundation/UA-ModelCompiler.git services/linting/UA-ModelCompiler
+```
+
 ```bash
 cd services/linting/App
 dotnet build -c Release
@@ -26,7 +32,7 @@ Output: `bin/Release/net10.0/CLOU.Linting`
 ## Usage
 
 ```bash
-CLOU.Linting <path-to-nodeset.xml> [--verbose]
+CLOU.Linting all -i [Input Dir with NodeSet XMLs] -uri [NamespaceUri of Namespace to calculate Metrics for] -o [Output Dir]
 ```
 
 ## Integration
@@ -40,6 +46,7 @@ This service is bundled into the backend Docker image. It's called automatically
 - Serilog
 - Newtonsoft.Json
 - JsonSchema.Net
+- UA-Modelcompiler (as C# Project)
 
 ## License
 

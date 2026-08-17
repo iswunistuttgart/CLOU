@@ -16,6 +16,12 @@ Analyzes OPC UA information models and calculates node counts, reference types, 
 
 ### Building
 
+UA-Modelcompiler is a prerequisite (cloning is only required once)
+
+```bash
+git clone https://github.com/OPCFoundation/UA-ModelCompiler.git services/metrics/UA-ModelCompiler
+```
+
 ```bash
 cd services/metrics/Metrics
 dotnet build -c Release
@@ -26,7 +32,7 @@ Output: `bin/Release/net10.0/Metrics`
 ## Usage
 
 ```bash
-Metrics <path-to-nodeset.xml> [--verbose]
+Metrics calc-metrics -i [Input Dir with NodeSet XMLs] -uri [NamespaceUri of Namespace to calculate Metrics for] -o [Output Dir]
 ```
 
 ## Integration
@@ -40,6 +46,7 @@ This service is bundled into the backend Docker image. It's called automatically
 - Serilog
 - Newtonsoft.Json
 - JsonSchema.Net
+- UA-Modelcompiler (as C# Project)
 
 ## License
 
