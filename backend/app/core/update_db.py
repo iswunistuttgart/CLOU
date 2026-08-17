@@ -394,7 +394,10 @@ def _upsert_nodes(
         "id", 
         "parent_id",
         "typedefinition_id",
-        "data_type_id"
+        "data_type_id",
+        "display_name_vector",
+        "definition_vector",
+        "description_vector",
     }
 
     for node_request in incoming_nodes:
@@ -414,9 +417,24 @@ def _upsert_nodes(
             session.add(node)
             nodes_inserted += 1
         else:
-            _apply_data_to_model(existing_node, node_data)
-            session.add(existing_node)
-            nodes_updated += 1
+            changed_fields = {
+                key
+                for key, value in node_data.items()
+                if getattr(existing_node, key) != value
+            }
+
+            if changed_fields:
+                _apply_data_to_model(existing_node, node_data)
+
+                if "display_name" in changed_fields:
+                    existing_node.display_name_vector = None
+                if "definition" in changed_fields:
+                    existing_node.definition_vector = None
+                if "description" in changed_fields:
+                    existing_node.description_vector = None
+
+                session.add(existing_node)
+                nodes_updated += 1
 
     session.flush()
 
