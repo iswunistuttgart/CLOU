@@ -40,7 +40,7 @@ class EmbeddingService:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip('/')
         # Embedding generation can be slow on cold starts / CPU, so use a longer read timeout.
-        self.client = httpx.Client(timeout=httpx.Timeout(90.0, connect=5.0))
+        self.client = httpx.Client(timeout=httpx.Timeout(180.0, connect=5.0))
         emb_logger.info(f"Embedding service client initialized: {self.base_url}")
     
     def embed_one(self, text: Optional[str]) -> Optional[list[float]]:
