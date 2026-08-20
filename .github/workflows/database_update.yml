@@ -1,4 +1,4 @@
-name: Monthly CLOU database update
+name: CLOU database update
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ permissions:
   packages: read
 
 jobs:
-  docker-setup-test:
+  clou-database-update:
     runs-on: ubuntu-latest
     timeout-minutes: 240
 
@@ -455,8 +455,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          BACKUP_SOURCE="$GITHUB_WORKSPACE/artifacts/db-backup.sql.zip"
-          BACKUP_TARGET="backups/db-backup.sql.zip"
+          BACKUP_SOURCE="$GITHUB_WORKSPACE/artifacts/db-backup.zip"
+          BACKUP_TARGET="backups/db-backup.zip"
           CURRENT_BRANCH="$(git branch --show-current)"
 
           if [ ! -s "$BACKUP_SOURCE" ]; then
@@ -470,7 +470,7 @@ jobs:
           fi
 
           # Falls noch nicht dauerhaft in .gitattributes konfiguriert:
-          git lfs track "backups/*.sql.zip"
+          git lfs track "backups/*.zip"
 
           mkdir -p "$(dirname "$BACKUP_TARGET")"
           cp "$BACKUP_SOURCE" "$BACKUP_TARGET"
@@ -497,7 +497,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: clou-db-backup-sql
-          path: artifacts/db-backup.sql.zip
+          path: artifacts/db-backup.zip
           if-no-files-found: error
           retention-days: 14
 
