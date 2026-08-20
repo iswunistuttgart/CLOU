@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           
-          git clone -b database-update --single-branch https://github.com/iswunistuttgart/clou.git clou
+          git clone --single-branch https://github.com/iswunistuttgart/clou.git clou
           cd clou
           git lfs install
           git lfs pull
