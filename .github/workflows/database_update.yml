@@ -1,3 +1,555 @@
-name: Mein Test Workflow
+name: Monthly CLOU database update
+
 on:
   workflow_dispatch:
+  schedule:
+    # Jeden ersten Tag des Monats um 03:00 UTC
+    - cron: "0 3 4 * *"
+
+concurrency:
+  group: clou-database-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  docker-setup-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Clone CLOU repository
+        run: |
+          set -euo pipefail
+          
+          git clone -b database-update --single-branch https://github.com/iswunistuttgart/clou.git clou
+          cd clou
+          git lfs install
+          git lfs pull
+
+      - name: Clone GitLab import scripts
+        run: |
+          git clone https://oauth2:${{ secrets.GITLAB_DATA_EXTRACTOR_READ_TOKEN }}@gitlab.cc-asp.fraunhofer.de/opc-ua-lab/clou/data_extractor.git import-scripts
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
+
+      - name: Install import script dependencies
+        working-directory: import-scripts
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --no-root
+
+      
+      - name: System info before start
+        run: |
+          echo "CPU:"
+          nproc
+
+          echo "Memory:"
+          free -h
+
+          echo "Disk:"
+          df -h
+
+          echo "Docker:"
+          docker version
+
+          echo "Docker Compose:"
+          docker compose version
+
+      - name: Validate compose file
+        working-directory: clou
+        run: |
+          docker compose config
+
+      - name: Docker disk usage before start
+        run: |
+          df -h
+          docker system df
+          docker image ls
+
+      - name: Start resource monitor
+        working-directory: clou
+        run: |
+          cat > monitor.sh <<'EOF'
+          #!/usr/bin/env bash
+          set +e
+
+          while true; do
+            echo "===== $(date -Is) ====="
+            echo "--- memory ---"
+            free -h
+            echo "--- disk ---"
+            df -h
+            echo "--- docker system df ---"
+            docker system df
+            echo "--- containers ---"
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+            echo "--- docker stats ---"
+            docker stats --no-stream || true
+            sleep 30
+          done
+          EOF
+
+          chmod +x monitor.sh
+          ./monitor.sh > resource-monitor.log 2>&1 &
+          echo $! > monitor.pid
+
+      - name: Start compose setup using existing images
+        working-directory: clou
+        run: |
+          set -euo pipefail
+
+          echo "Configured images:"
+          docker compose config --images
+      
+          docker compose pull
+          docker compose --profile import up -d --no-build
+
+      - name: Dump backend health log
+        if: always()
+        working-directory: clou
+        run: |
+          cid="$(docker compose ps -a -q backend || true)"
+          [ -n "$cid" ] || exit 0
+          docker inspect --format '{{json .State.Health}}' "$cid" | python3 -m json.tool || true
+          docker inspect --format '{{json .Config.Healthcheck}}' "$cid" | python3 -m json.tool || true
+
+      - name: Show compose status
+        working-directory: clou
+        run: |
+          docker compose ps
+          docker ps -a
+
+      - name: Wait for db health
+        working-directory: clou
+        run: |
+          set -e
+
+          for i in {1..90}; do
+            cid="$(docker compose ps -q db || true)"
+
+            if [ -n "$cid" ]; then
+              status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid")"
+              echo "db status: $status"
+
+              if [ "$status" = "healthy" ]; then
+                exit 0
+              fi
+
+              if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+                docker compose logs --tail=200 db
+                exit 1
+              fi
+            fi
+
+            sleep 2
+          done
+
+          docker compose logs --tail=200 db
+          exit 1
+
+      - name: Wait for embedding-service health
+        working-directory: clou
+        run: |
+          set -e
+
+          for i in {1..300}; do
+            cid="$(docker compose ps -q embedding-service || true)"
+
+            if [ -n "$cid" ]; then
+              status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid")"
+              echo "embedding-service status: $status"
+
+              if [ "$status" = "healthy" ]; then
+                exit 0
+              fi
+
+              if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+                docker compose logs --tail=200 embedding-service
+                exit 1
+              fi
+            fi
+
+            sleep 2
+          done
+
+          docker compose logs --tail=200 embedding-service
+          exit 1
+
+      - name: Wait for prestart completion
+        working-directory: clou
+        run: |
+          set -e
+
+          for i in {1..150}; do
+            cid="$(docker compose ps -a -q prestart || true)"
+
+            if [ -n "$cid" ]; then
+              state="$(docker inspect -f '{{.State.Status}}' "$cid")"
+              exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$cid")"
+
+              echo "prestart state=$state exit_code=$exit_code"
+
+              if [ "$state" = "exited" ] && [ "$exit_code" = "0" ]; then
+                exit 0
+              fi
+
+              if [ "$state" = "exited" ] && [ "$exit_code" != "0" ]; then
+                docker compose logs --tail=200 prestart
+                exit 1
+              fi
+            fi
+
+            sleep 2
+          done
+
+          docker compose logs --tail=200 prestart
+          exit 1
+
+      - name: Wait for backend health
+        working-directory: clou
+        run: |
+          set -e
+
+          for i in {1..150}; do
+            cid="$(docker compose ps -q backend || true)"
+
+            if [ -n "$cid" ]; then
+              status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid")"
+              echo "backend status: $status"
+
+              if [ "$status" = "healthy" ]; then
+                exit 0
+              fi
+
+              if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+                docker compose logs --tail=200 backend
+                exit 1
+              fi
+            fi
+
+            sleep 2
+          done
+
+          docker compose logs --tail=200 backend
+          exit 1
+
+      - name: Backend HTTP health check
+        run: |
+          curl -f http://localhost:8000/api/v1/utils/health-check/
+
+      - name: Docker stats after setup is healthy
+        working-directory: clou
+        run: |
+          echo "Compose status:"
+          docker compose ps
+
+          echo ""
+          echo "Docker stats:"
+          docker stats --no-stream
+
+          echo ""
+          echo "Docker system df:"
+          docker system df
+
+          echo ""
+          echo "Memory:"
+          free -h
+
+          echo ""
+          echo "Disk:"
+          df -h
+
+      - name: Basic database query
+        working-directory: clou
+        run: |
+          docker compose exec -T db sh -lc '
+            psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT version();"
+          '
+
+      - name: Create .env file
+        working-directory: import-scripts
+        run: |
+          cat > .env << EOF
+          API_URL=http://127.0.0.1:8000
+          NODE_POST_WORKERS=12
+          NODE_POST_SECOND_RUN_WORKERS=12
+          NODE_POST_SECOND_RUN_HTTP_POOL_MAXSIZE=100
+          GITHUB_TOKEN=${{ secrets.PRIVATE_GITHUB_TOKEN_FOR_FETCHING }}
+          EOF
+
+      - name: Run import script
+        working-directory: import-scripts
+        env:
+          BACKEND_URL: http://localhost:8000
+        run: |
+          poetry run python main.py
+
+      - name: Wait for embedding catch-up
+        working-directory: clou
+        timeout-minutes: 185
+        run: |
+          set -euo pipefail
+      
+          timeout --signal=TERM --kill-after=30s 10800s \
+            docker compose exec -T backend python -u - <<'PY'
+          import time
+          from sqlalchemy import text
+          from sqlalchemy.orm import sessionmaker
+          from sqlmodel import Session
+      
+          from app.core.db import engine
+          from app.services.embeddings import count_pending_embeddings
+      
+          session_maker = sessionmaker(
+              bind=engine,
+              class_=Session,
+              expire_on_commit=False,
+          )
+      
+          stable_zero_checks = 0
+          last_pending = -1
+          stuck_checks = 0
+      
+          while stable_zero_checks < 3:
+              pending = count_pending_embeddings(session_maker)
+              print(f"Pending embeddings: {pending}", flush=True)
+      
+              if pending == 0:
+                  stable_zero_checks += 1
+                  stuck_checks = 0
+              else:
+                  stable_zero_checks = 0
+                  if pending == last_pending:
+                      stuck_checks += 1
+                  else:
+                      stuck_checks = 0
+                  last_pending = pending
+      
+                  # Wenn 100 Mal (500 Sekunden) die gleiche Zahl > 0: Abbruch und Details ausgeben
+                  if stuck_checks >= 100:
+                      print("!!! STUCK DETECTED: Pending items did not change for 500s !!!", flush=True)
+                      with session_maker() as session:
+                          print("--- Pending Nodes ---", flush=True)
+                          rows = session.execute(text("""
+                              SELECT id, 
+                                     left(display_name, 50) as display_name, 
+                                     left(definition, 50) as definition, 
+                                     left(description, 50) as description
+                              FROM node 
+                              WHERE (display_name IS NOT NULL AND display_name_vector IS NULL)
+                                 OR (definition    IS NOT NULL AND definition_vector    IS NULL)
+                                 OR (description   IS NOT NULL AND description_vector   IS NULL)
+                          """))
+                          for row in rows:
+                              print(f"Node ID: {row.id} | DN: {row.display_name!r} | DEF: {row.definition!r} | DESC: {row.description!r}", flush=True)
+      
+                          print("--- Pending Specs ---", flush=True)
+                          rows = session.execute(text("""
+                              SELECT id, left(summary, 50) as summary
+                              FROM spec 
+                              WHERE summary IS NOT NULL AND summary_vector IS NULL
+                          """))
+                          for row in rows:
+                              print(f"Spec ID: {row.id} | SUMMARY: {row.summary!r}", flush=True)
+                      
+                      print("Exiting early due to stuck pending embeddings.", flush=True)
+                      exit(1)
+      
+              if stable_zero_checks < 3:
+                  time.sleep(5)
+      
+          print("Embedding catch-up complete", flush=True)
+          PY
+    
+      - name: Create database backup SQL file
+        working-directory: clou
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+          DUMP_MODE: copy
+          DISABLE_TRIGGERS: "true"
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+
+          BACKUP_FILE="$GITHUB_WORKSPACE/artifacts/db-backup.sql"
+
+          echo "Find DB container via docker compose service 'db'..."
+          POSTGRES_CONTAINER_ID="$(docker compose ps -q db)"
+
+          if [ -z "$POSTGRES_CONTAINER_ID" ]; then
+            echo "Could not find running DB container for service 'db'"
+            echo "Running containers:"
+            docker ps
+            exit 1
+          fi
+
+          echo "DB container ID: $POSTGRES_CONTAINER_ID"
+
+          echo "Check DB container is running..."
+          docker ps --filter "id=$POSTGRES_CONTAINER_ID"
+
+          base_dump_args=(
+            --data-only
+            --no-owner
+            --no-privileges
+            --exclude-table-data=public.alembic_version
+            -U "$POSTGRES_USER"
+            -d "$POSTGRES_DB"
+          )
+
+          if [ "$DISABLE_TRIGGERS" = "true" ]; then
+            base_dump_args+=(--disable-triggers)
+          elif [ "$DISABLE_TRIGGERS" != "false" ]; then
+            echo "Invalid DISABLE_TRIGGERS '$DISABLE_TRIGGERS'. Allowed values: true, false"
+            exit 1
+          fi
+
+          if [ "$DUMP_MODE" = "insert" ]; then
+            dump_args=(
+              "${base_dump_args[@]}"
+              --inserts
+              --on-conflict-do-nothing
+            )
+          elif [ "$DUMP_MODE" = "copy" ]; then
+            dump_args=("${base_dump_args[@]}")
+          else
+            echo "Invalid DUMP_MODE '$DUMP_MODE'. Allowed values: copy, insert"
+            exit 1
+          fi
+
+          echo "Create PostgreSQL dump..."
+          docker exec \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            -i "$POSTGRES_CONTAINER_ID" \
+            pg_dump "${dump_args[@]}" > "$BACKUP_FILE"
+
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "Database backup is missing or empty."
+            exit 1
+          fi
+
+          chmod 644 "$BACKUP_FILE"
+
+          echo "Backup created:"
+          ls -lh "$BACKUP_FILE"
+
+      - name: Commit and push backup using Git LFS
+        working-directory: clou
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          BACKUP_SOURCE="$GITHUB_WORKSPACE/artifacts/db-backup.sql.zip"
+          BACKUP_TARGET="backups/db-backup.sql.zip"
+          CURRENT_BRANCH="$(git branch --show-current)"
+
+          if [ ! -s "$BACKUP_SOURCE" ]; then
+            echo "Backup file is missing or empty: $BACKUP_SOURCE"
+            exit 1
+          fi
+
+          if [ -z "$CURRENT_BRANCH" ]; then
+            echo "Repository is in detached HEAD state."
+            exit 1
+          fi
+
+          # Falls noch nicht dauerhaft in .gitattributes konfiguriert:
+          git lfs track "backups/*.sql.zip"
+
+          mkdir -p "$(dirname "$BACKUP_TARGET")"
+          cp "$BACKUP_SOURCE" "$BACKUP_TARGET"
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .gitattributes "$BACKUP_TARGET"
+
+          if git diff --cached --quiet; then
+            echo "Database backup has not changed."
+            exit 0
+          fi
+
+          git commit -m "chore: update monthly CLOU database backup"
+
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git push origin "HEAD:$CURRENT_BRANCH"
+      
+      - name: Upload database backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clou-db-backup-sql
+          path: artifacts/db-backup.sql.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Final compose status
+        if: always()
+        working-directory: clou
+        run: |
+          docker compose ps || true
+          docker ps -a || true
+
+      - name: Show logs
+        if: always()
+        working-directory: clou
+        run: |
+          docker compose logs --tail=120 db || true
+          docker compose logs --tail=120 embedding-service || true
+          docker compose logs --tail=120 prestart || true
+          docker compose logs --tail=120 backend || true
+          docker compose logs --tail=120 embedding-catchup-worker || true
+
+      - name: Final resource usage
+        if: always()
+        run: |
+          echo "Memory:"
+          free -h
+
+          echo "Disk:"
+          df -h
+
+          echo "Docker:"
+          docker system df || true
+
+      - name: Resource monitor tail
+        if: always()
+        working-directory: clou
+        run: |
+          if [ -f resource-monitor.log ]; then
+            tail -300 resource-monitor.log
+          fi
+
+      - name: Stop resource monitor
+        if: always()
+        working-directory: clou
+        run: |
+          if [ -f monitor.pid ]; then
+            kill "$(cat monitor.pid)" || true
+          fi
+
+      - name: Cleanup
+        if: always()
+        working-directory: clou
+        run: |
+          docker compose down -v --remove-orphans || true
+          docker builder prune -af || true
+          docker system prune -af || true
