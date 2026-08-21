@@ -448,6 +448,15 @@ jobs:
           echo "Backup created:"
           ls -lh "$BACKUP_FILE"
 
+      - name: Compress database backup
+        run: |
+          set -euo pipefail
+      
+          zip -9 -j artifacts/db-backup.zip artifacts/db-backup.sql
+      
+          test -s artifacts/db-backup.zip
+          ls -lh artifacts/db-backup.sql artifacts/db-backup.zip
+
       - name: Commit and push backup using Git LFS
         working-directory: clou
         env:
