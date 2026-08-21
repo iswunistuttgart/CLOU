@@ -463,7 +463,7 @@ jobs:
           set -euo pipefail
 
           BACKUP_SOURCE="$GITHUB_WORKSPACE/artifacts/db-backup.zip"
-          BACKUP_TARGET="backups/db-backup.zip"
+          BACKUP_TARGET="backend/data/db-backup.zip"
           CURRENT_BRANCH="$(git branch --show-current)"
 
           if [ ! -s "$BACKUP_SOURCE" ]; then
@@ -476,7 +476,7 @@ jobs:
             exit 1
           fi
 
-          git lfs track "backups/*.zip"
+          git lfs track "backend/data/*.zip"
 
           mkdir -p "$(dirname "$BACKUP_TARGET")"
           cp "$BACKUP_SOURCE" "$BACKUP_TARGET"
