@@ -3,7 +3,6 @@ name: CLOU database update
 on:
   workflow_dispatch:
   schedule:
-    # Jeden ersten Tag des Monats um 03:00 UTC
     - cron: "0 3 4 * *"
 
 concurrency:
@@ -337,7 +336,6 @@ jobs:
                       stuck_checks = 0
                   last_pending = pending
       
-                  # Wenn 100 Mal (500 Sekunden) die gleiche Zahl > 0: Abbruch und Details ausgeben
                   if stuck_checks >= 100:
                       print("!!! STUCK DETECTED: Pending items did not change for 500s !!!", flush=True)
                       with session_maker() as session:
@@ -478,7 +476,6 @@ jobs:
             exit 1
           fi
 
-          # Falls noch nicht dauerhaft in .gitattributes konfiguriert:
           git lfs track "backups/*.zip"
 
           mkdir -p "$(dirname "$BACKUP_TARGET")"
