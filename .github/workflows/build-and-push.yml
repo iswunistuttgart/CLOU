@@ -4,8 +4,14 @@ on:
   push:
     branches: [main]
     tags: ["v*.*.*"]
+    
   pull_request:
     branches: [main]
+  
+  workflow_run:
+    workflows: ["CLOU database update"]
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -16,6 +22,9 @@ env:
 
 jobs:
   build-and-push:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -39,6 +48,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
           lfs: true
 
       - name: Set lowercase image prefix
