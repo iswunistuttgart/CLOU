@@ -87,8 +87,6 @@ services:
         condition: service_started
       prestart:
         condition: service_completed_successfully
-    volumes:
-      - ./backend/data/db-backup.zip:/app/data/db-backup.zip:ro
     environment:
       - PROJECT_NAME=${PROJECT_NAME:-CLOU}
       - FRONTEND_HOST=${FRONTEND_HOST:-http://localhost:5173}
