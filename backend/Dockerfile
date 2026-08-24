@@ -1,5 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:548d93f8a18a1acbe6cc127bc4f47281430d34a9e35c18afa80a8d6741c2adc3 AS linting-build
 
+ARG UA_MODEL_COMPILER_REF=1a17d31a909e4c2c7e977d983b2920508c024bf7
+
 WORKDIR /src
 
 RUN apt-get update && \
@@ -9,7 +11,9 @@ RUN apt-get update && \
 COPY services/linting /src/services/linting
 
 RUN if [ ! -d /src/services/linting/UA-ModelCompiler/Opc.Ua.ModelCompiler ]; then \
-    git clone https://github.com/OPCFoundation/UA-ModelCompiler.git /src/services/linting/UA-ModelCompiler; \
+    git clone https://github.com/OPCFoundation/UA-ModelCompiler.git /src/services/linting/UA-ModelCompiler && \
+    git -C /src/services/linting/UA-ModelCompiler checkout "$UA_MODEL_COMPILER_REF" && \
+    rm -f /src/services/linting/UA-ModelCompiler/NuGet.config; \
     fi
 
 RUN dotnet publish /src/services/linting/App/CLOU.Linting.csproj \
@@ -22,6 +26,8 @@ RUN dotnet publish /src/services/linting/App/CLOU.Linting.csproj \
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:548d93f8a18a1acbe6cc127bc4f47281430d34a9e35c18afa80a8d6741c2adc3 AS metrics-build
 
+ARG UA_MODEL_COMPILER_REF=1a17d31a909e4c2c7e977d983b2920508c024bf7
+
 WORKDIR /src
 
 RUN apt-get update && \
@@ -31,7 +37,9 @@ RUN apt-get update && \
 COPY services/metrics /src/services/metrics
 
 RUN if [ ! -d /src/services/metrics/UA-ModelCompiler/Opc.Ua.ModelCompiler ]; then \
-    git clone https://github.com/OPCFoundation/UA-ModelCompiler.git /src/services/metrics/UA-ModelCompiler; \
+    git clone https://github.com/OPCFoundation/UA-ModelCompiler.git /src/services/metrics/UA-ModelCompiler && \
+    git -C /src/services/metrics/UA-ModelCompiler checkout "$UA_MODEL_COMPILER_REF" && \
+    rm -f /src/services/metrics/UA-ModelCompiler/NuGet.config; \
     fi
 
 RUN dotnet publish /src/services/metrics/Metrics/Metrics.csproj \

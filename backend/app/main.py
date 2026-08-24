@@ -22,11 +22,10 @@ from starlette.middleware.cors import CORSMiddleware
 import logging, sys
 from contextlib import asynccontextmanager
 import asyncio
-from pathlib import Path
 
 from app.api.main import api_router
 from app.core.config import settings
-from app.core.db import ensure_node_search_db_artifacts, initialize_database, engine
+from app.core.db import ensure_node_search_db_artifacts, engine
 from app.services.embedding_catchup import (
     embedding_catchup_loop,
     get_catchup_runtime_config,
@@ -78,31 +77,10 @@ def _truncate_for_log(value, max_len: int = 200):
     return value
 
 
-def get_sql_backup_path() -> str:
-    local_backup_path = Path("data/db-backup.zip")
-    if local_backup_path.is_file():
-        return str(local_backup_path)
-    return "/backups/db-backup.sql"
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # app startup
-    logger.info("Startup: init database...")
-    # DB init
     try:
-        init_result = initialize_database(
-            sql_file_path=get_sql_backup_path(),
-            logger=logger,
-        )
-
-        if init_result == "restored":
-            logger.info("Database initialized from backup.")
-        elif init_result == "seeded":
-            logger.info("Database initialized from application seed data.")
-        else:
-            logger.info("Database initialization skipped because data already exists.")
-
         if settings.NODE_SEARCH_ENSURE_DB_ARTIFACTS_ON_STARTUP:
             ensure_node_search_db_artifacts(logger=logger)
     except Exception as e:

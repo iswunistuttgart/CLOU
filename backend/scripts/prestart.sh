@@ -80,3 +80,23 @@ with engine.connect() as conn:
 
 # Run migrations
 run_alembic_upgrade
+
+# Restore or seed database contents before the API container starts.
+echo "Initializing database contents..."
+python -c "
+import logging
+
+from app.core.db import get_sql_backup_path, initialize_database
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+logger = logging.getLogger('app.prestart')
+
+init_result = initialize_database(sql_file_path=get_sql_backup_path(), logger=logger)
+
+if init_result == 'restored':
+    logger.info('Database initialized from backup.')
+elif init_result == 'seeded':
+    logger.info('Database initialized from application seed data.')
+else:
+    logger.info('Database initialization skipped because data already exists.')
+"

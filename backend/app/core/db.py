@@ -17,6 +17,7 @@ import os
 import subprocess
 import logging
 import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 from sqlalchemy import text
@@ -78,6 +79,81 @@ def _get_existing_seed_tables() -> list[str]:
 
 def _database_already_seeded() -> bool:
     return not _get_incomplete_seed_tables()
+
+
+def get_sql_backup_path() -> str:
+    local_backup_path = Path("data/db-backup.zip")
+    if local_backup_path.is_file():
+        return str(local_backup_path)
+    return "/backups/db-backup.zip"
+
+
+def _run_psql_restore(
+    psql_command: list[str],
+    zip_file_path: str,
+    sql_file_name_in_zip: str,
+    truncate_stmt: str,
+    env: dict[str, str],
+    cwd: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(
+        mode="w+b"
+    ) as stderr_file:
+        process = subprocess.Popen(
+            psql_command,
+            stdin=subprocess.PIPE,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            env=env,
+            cwd=cwd,
+        )
+
+        if process.stdin is None:
+            raise RuntimeError("psql stdin pipe could not be opened.")
+
+        restore_error: Exception | None = None
+
+        try:
+            if truncate_stmt:
+                process.stdin.write(truncate_stmt.encode("utf-8"))
+
+            with zipfile.ZipFile(zip_file_path, "r") as backup_zip:
+                with backup_zip.open(sql_file_name_in_zip, "r") as sql_file:
+                    shutil.copyfileobj(sql_file, process.stdin)
+        except BrokenPipeError:
+            pass
+        except Exception as exc:
+            restore_error = exc
+        finally:
+            try:
+                process.stdin.close()
+            except BrokenPipeError:
+                pass
+
+        returncode = process.wait()
+
+        stdout_file.seek(0)
+        stderr_file.seek(0)
+        stdout = stdout_file.read().decode("utf-8", errors="replace")
+        stderr = stderr_file.read().decode("utf-8", errors="replace")
+
+    if restore_error is not None:
+        raise restore_error
+
+    if returncode != 0:
+        raise subprocess.CalledProcessError(
+            returncode=returncode,
+            cmd=psql_command,
+            output=stdout,
+            stderr=stderr,
+        )
+
+    return subprocess.CompletedProcess(
+        args=psql_command,
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
 
 
 def _get_current_alembic_head() -> str:
@@ -236,17 +312,15 @@ def load_sql_backup(
             raise FileNotFoundError(
                 f"{sql_file_name_in_zip} was not found inside {zip_file_path}."
             )
-        with backup_zip.open(sql_file_name_in_zip, "r") as sql_file:
-            sql_script = sql_file.read().decode("utf-8")
 
     existing_tables = _get_existing_seed_tables()
+    truncate_stmt = ""
     if existing_tables:
         truncate_stmt = (
             "TRUNCATE TABLE "
             + ", ".join(f"public.{t}" for t in existing_tables)
             + " RESTART IDENTITY CASCADE;\n"
         )
-        sql_script = truncate_stmt + sql_script
 
 
     # Prepare environment variables for psql, especially PGPASSWORD
@@ -272,13 +346,12 @@ def load_sql_backup(
             if settings.POSTGRES_PORT:
                 psql_command.extend(["-p", str(settings.POSTGRES_PORT)])
 
-            result = subprocess.run(
+            result = _run_psql_restore(
                 psql_command,
-                input=sql_script,
+                zip_file_path=zip_file_path,
+                sql_file_name_in_zip=sql_file_name_in_zip,
+                truncate_stmt=truncate_stmt,
                 env=env,
-                check=True,
-                capture_output=True,
-                text=True,
             )
 
         else:
@@ -308,14 +381,13 @@ def load_sql_backup(
                 "--quiet",
             ]
 
-            result = subprocess.run(
+            result = _run_psql_restore(
                 compose_command,
+                zip_file_path=zip_file_path,
+                sql_file_name_in_zip=sql_file_name_in_zip,
+                truncate_stmt=truncate_stmt,
                 cwd=str(PROJECT_ROOT),
                 env=env,
-                input=sql_script,
-                check=True,
-                capture_output=True,
-                text=True,
             )
 
         logger.info("SQL backup loaded successfully using psql.")
