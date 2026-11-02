@@ -16,7 +16,9 @@ RUN if [ ! -d /src/services/linting/UA-ModelCompiler/Opc.Ua.ModelCompiler ]; the
     rm -f /src/services/linting/UA-ModelCompiler/NuGet.config; \
     fi
 
-RUN dotnet publish /src/services/linting/App/CLOU.Linting.csproj \
+RUN dotnet add /src/services/linting/UA-ModelCompiler/Opc.Ua.ModelCompiler/Opc.Ua.ModelCompiler.csproj \
+    package Microsoft.OpenApi.Readers --version 1.6.30 --no-restore && \
+    dotnet publish /src/services/linting/App/CLOU.Linting.csproj \
     -c Release \
     -r linux-x64 \
     --self-contained \
@@ -42,7 +44,9 @@ RUN if [ ! -d /src/services/metrics/UA-ModelCompiler/Opc.Ua.ModelCompiler ]; the
     rm -f /src/services/metrics/UA-ModelCompiler/NuGet.config; \
     fi
 
-RUN dotnet publish /src/services/metrics/Metrics/Metrics.csproj \
+RUN dotnet add /src/services/metrics/UA-ModelCompiler/Opc.Ua.ModelCompiler/Opc.Ua.ModelCompiler.csproj \
+    package Microsoft.OpenApi.Readers --version 1.6.30 --no-restore && \
+    dotnet publish /src/services/metrics/Metrics/Metrics.csproj \
     -c Release \
     -r linux-x64 \
     --self-contained \
