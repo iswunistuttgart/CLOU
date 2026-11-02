@@ -30,7 +30,7 @@ jobs:
 
       - name: Clone GitLab import scripts
         run: |
-          git clone https://oauth2:${{ secrets.GITLAB_DATA_EXTRACTOR_READ_TOKEN }}@https://gitlab-ee.fraunhofer.de/archive-gitlab-cc/clou_data_extractor.git import-scripts
+          git clone https://oauth2:${{ secrets.GITLAB_DATA_EXTRACTOR_READ_TOKEN }}@gitlab-ee.fraunhofer.de/archive-gitlab-cc/clou_data_extractor.git import-scripts
 
       - name: Set up Python
         uses: actions/setup-python@v5
